@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>반별 리스크 그리드 (v2.7 · 4열 · 요약에 수행률 표시)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .chip{border:1px solid #e2e8f0;border-radius:9999px;padding:6px 10px;font-size:12px;background:#f8fafc}
+    .chip.active{background:#111827;color:#fff;border-color:#111827}
+    .sticky-th th{position:sticky;top:0;background:#f8fafc}
+    .err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .badge{font-size:11px;border:1px solid #e5e7eb;border-radius:9999px;padding:2px 8px;background:#f9fafb}
+    details>summary::-webkit-details-marker{display:none}
+    .summary{cursor:pointer}
+    .bar{height:10px;border-radius:9999px;background:#e5e7eb;overflow:hidden}
+    .bar>span{display:block;height:100%}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-[1600px] mx-auto p-4">
+    <header class="mb-4 flex items-center gap-2">
+      <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드로</a>
+      <a href="./teacher_risk_v2.html"  class="ml-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">  담임별 관리</a>
+
+      <h1 class="text-2xl font-bold">반별 리스크 그리드</h1>
+      <span class="ml-auto text-xs text-slate-500">미수행자 많은 반 순 • 4열 • 상세 접힘</span>
+    </header>
+
+    <div id="errbox" class="hidden err rounded-lg p-3 mb-3 text-sm"></div>
+
+    <!-- 필터/옵션 박스 (간결 버전) -->
+    <section class="mb-4 bg-white rounded-xl shadow p-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="flex flex-wrap items-end gap-4">
+          <div><label class="block text-xs font-medium mb-1">시작일</label><input id="startDate" type="date" class="w-44 rounded-lg border-slate-300" /></div>
+          <div><label class="block text-xs font-medium mb-1">종료일</label><input id="endDate" type="date" class="w-44 rounded-lg border-slate-300" /></div>
+          <div class="grow">
+            <div class="text-xs font-medium mb-1">빠른 선택</div>
+            <div class="flex flex-wrap gap-2">
+              <button class="chip" id="rngAll">전체</button><button class="chip" id="rngToday">오늘</button>
+              <button class="chip" id="rngWeekMon">이번주(월~일)</button><button class="chip" id="rngMonth">이번달</button>
+              <button class="chip" id="rngLastWeek">지난주</button><button class="chip" id="rngLastMonth">지난달</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-end gap-4">
+          <div><label class="block text-xs font-medium mb-1">임계값(수행률 % 미만)</label><input id="threshold" type="number" min="0" max="100" value="70" class="w-24 rounded-lg border-slate-300 text-right" /></div>
+          <div><label class="block text-xs font-medium mb-1">최소 기록 수(학생별)</label><input id="minCnt" type="number" min="1" value="3" class="w-20 rounded-lg border-slate-300 text-right"/></div>
+          <div><label class="block text-xs font-medium mb-1">선생님(작성자) 필터</label><select id="teacherSel" class="w-56 rounded-lg border-slate-300"><option value="__ALL__">전체</option></select></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="ml-auto text-right"><div class="text-xs text-slate-500 mb-1">선택된 기간</div><div id="rangeBadge" class="inline-block chip">전체</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 그리드 -->
+    <section id="grid" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"></section>
+
+    <!-- 데이터 업로드 / 로딩 -->
+    <div class="fixed bottom-4 right-4">
+      <div class="bg-white rounded-xl shadow-lg p-3 flex items-center gap-2">
+        <input type="file" accept=".xlsx,.csv" id="fileInput" class="block text-sm" />
+        <label class="inline-flex items-center gap-1 text-xs"><input id="autoLoad" type="checkbox" class="rounded border" />자동불러오기</label>
+        <button id="clearSaved" class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장삭제</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ===== 기본 =====
+const LS_KEYS={autoload:'lancon_autoload',data:'lancon_data_json',savedAt:'lancon_saved_at'}; let RAW=[];
+const $=id=>document.getElementById(id);
+const els={startDate:$('startDate'),endDate:$('endDate'),rngAll:$('rngAll'),rngToday:$('rngToday'),rngWeekMon:$('rngWeekMon'),rngMonth:$('rngMonth'),rngLastWeek:$('rngLastWeek'),rngLastMonth:$('rngLastMonth'),rangeBadge:$('rangeBadge'),threshold:$('threshold'),minCnt:$('minCnt'),teacherSel:$('teacherSel'),grid:$('grid'),fileInput:$('fileInput'),autoLoad:$('autoLoad'),clearSaved:$('clearSaved'),errbox:$('errbox')};
+const showErr=m=>{els.errbox.textContent=m;els.errbox.classList.remove('hidden');console.error(m)}; const clearErr=()=>{els.errbox.classList.add('hidden');els.errbox.textContent=''};
+const fmtYMD=d=>{const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`};
+function parseDate(v){if(v==null||v==='')return null;if(typeof v==='number'){try{const d=XLSX.SSF.parse_date_code(v);return new Date(d.y,d.m-1,d.d)}catch{return null}}const s=String(v).trim().replace(/[.\/]/g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3]);const d=new Date(s);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function inRangeDate(d,{s,e}){const noF=!s&&!e;if(noF)return true;if(!d)return false;if(s&&d<s)return false;if(e&&d>e)return false;return true}
+function normalizeStatus(v){const s=String(v||'').trim();if(/과제안함|미수행|결석/.test(s))return'미수행';if(/해당없음|자료없음|배정없음/.test(s))return'제외';if(/^\d+$/.test(s))return(+s)>=1?'수행':'미수행';if(/^\d+%$/.test(s))return parseInt(s,10)>=1?'수행':'미수행';return'기타'}
+function mapRecord(r){const c={};for(const k in r){const nk=String(k).replace(/\ufeff/g,'').trim();const v=r[k];c[nk]=(typeof v==='string')?v.trim():v}const o={'날짜':c['날짜']??c['date']??c['Date']??'','작성자':c['작성자']??c['선생님']??c['Teacher']??'','과목':c['과목']??c['제목']??c['유형']??c['subject']??'','반코드':c['반코드']??c['반명']??c['반']??c['class']??'','학생명':c['학생명']??c['학생']??c['이름']??c['student']??'','상태':c['상태']??c['구분']??c['점수']??c['점수/비고']??c['결과']??''};for(const k in o){if(typeof o[k]==='string')o[k]=o[k].trim()}return o}
+const rate=(done,miss)=>Math.round((done/((done+miss)||1))*100);
+
+// ===== 저장/불러오기 =====
+function saveData(rows){localStorage.setItem(LS_KEYS.data,JSON.stringify(rows));localStorage.setItem(LS_KEYS.savedAt,new Date().toISOString())}
+function loadDataFromLocal(){const flag=localStorage.getItem(LS_KEYS.autoload)==='1';els.autoLoad.checked=flag;const json=localStorage.getItem(LS_KEYS.data);if(flag&&json){try{const rows=JSON.parse(json);if(Array.isArray(rows)&&rows.length){RAW=rows;return true}}catch(e){showErr('저장 데이터 읽기 오류: '+e.message)}}return false}
+function clearLocal(){localStorage.removeItem(LS_KEYS.data);localStorage.removeItem(LS_KEYS.savedAt)}
+async function parseFile(file){const isCSV=/\.csv$/i.test(file.name||'');try{if(isCSV){const text=await file.text();let json=readCSVText(text);if((!json||!json.length)&&text.charCodeAt(0)===0xFEFF)json=readCSVText(text.slice(1));return json||[]}else{const buf=await file.arrayBuffer();return readArray(buf)||[]}}catch(e){showErr('파일 파싱 실패: '+e.message);return[]}} 
+function readCSVText(text){try{const first=(text.split(/\r?\n/).find(l=>l.trim().length>0)||'');const cnt={comma:(first.match(/,/g)||[]).length,tab:(first.match(/\t/g)||[]).length,semi:(first.match(/;/g)||[]).length};let n=text;if(cnt.tab>cnt.comma&&cnt.tab>=cnt.semi)n=text.replace(/\t/g,',');else if(cnt.semi>cnt.comma&&cnt.semi>cnt.tab)n=text.replace(/;/g,',');n=n.replace(/\r\n/g,'\n');const wb=XLSX.read(n,{type:'string'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('CSV 파싱 실패: '+e.message);return null}}
+function readArray(buf){try{const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('바이너리 읽기 실패: '+e.message);return null}}
+
+// ===== 범위/보조 =====
+const getRange=()=>{const sd=els.startDate.value,ed=els.endDate.value;const s=sd?new Date(sd+'T00:00:00'):null;const e=ed?new Date(ed+'T23:59:59.999'):null;return{s,e}};
+function updateBadge(){const sd=els.startDate.value,ed=els.endDate.value;els.rangeBadge.textContent=(!sd&&!ed)?'전체':`${sd||'..'} ~ ${ed||'..'}`}
+function setRange(s,e){els.startDate.value=s?fmtYMD(s):'';els.endDate.value=e?fmtYMD(e):'';updateBadge();renderAll()}
+function actChip(el){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el?.classList.add('active')}
+function bindRangeChips(){const today=new Date();els.rngAll.onclick=()=>{setRange(null,null);actChip(els.rngAll)};els.rngToday.onclick=()=>{setRange(today,today);actChip(els.rngToday)};els.rngWeekMon.onclick=()=>{const d=new Date();const day=(d.getDay()+6)%7;const s=new Date(d);s.setDate(d.getDate()-day);const e=new Date(s);e.setDate(s.getDate()+6);setRange(s,e);actChip(els.rngWeekMon)};els.rngMonth.onclick=()=>{const d=new Date();const s=new Date(d.getFullYear(),d.getMonth(),1);const e=new Date(d.getFullYear(),d.getMonth()+1,0);setRange(s,e);actChip(els.rngMonth)};els.rngLastWeek.onclick=()=>{const d=new Date();const day=(d.getDay()+6)%7;const e=new Date(d);e.setDate(d.getDate()-day-1);const s=new Date(e);s.setDate(e.getDate()-6);setRange(s,e);actChip(els.rngLastWeek)};els.rngLastMonth.onclick=()=>{const d=new Date();const s=new Date(d.getFullYear(),d.getMonth()-1,1);const e=new Date(d.getFullYear(),d.getMonth(),0);setRange(s,e);actChip(els.rngLastMonth)}}
+
+// ===== 집계 & 렌더 =====
+function aggregateByClass(){
+  const range=getRange(); const th=Math.max(0,Math.min(100,+els.threshold.value||70)); const minCnt=Math.max(1,+els.minCnt.value||1);
+  const tchFilter=els.teacherSel.value;
+
+  // 학생 단위 버킷
+  const studentBuckets={};
+  RAW.forEach(r=>{
+    const d=parseDate(r['날짜']); if(!inRangeDate(d,range)) return;
+    const tch=(r['작성자']||'').trim(); if(tchFilter!=='__ALL__'&&tch!==tchFilter) return;
+    const cls=(r['반코드']||'').trim(); const st=normalizeStatus(r['상태']); const key=[r['학생명']||'',cls].join('|');
+    studentBuckets[key]??={학생:r['학생명']||'',반:cls,수행:0,미수행:0,담당집:new Set()};
+    if(tch) studentBuckets[key].담당집.add(tch);
+    if(st==='수행') studentBuckets[key].수행++; else if(st==='미수행') studentBuckets[key].미수행++;
+  });
+
+  // 반 보드 생성
+  const classBoards={};
+  Object.values(studentBuckets).forEach(v=>{
+    const board=(classBoards[v.반]||={반:v.반||'(반 미지정)',riskCnt:0,totalCnt:0,students:[],classDone:0,classMiss:0});
+    const total=v.수행+v.미수행;
+    board.totalCnt++;
+    board.classDone+=v.수행; board.classMiss+=v.미수행;
+    const rr=rate(v.수행,v.미수행);
+    // 리스크 카운트는 임계/최소건수 기준
+    if(total>=minCnt && rr<th){ board.riskCnt++; }
+    // ★ 리스트에는 "모든 학생" 수록 (담당, 수행/미수행, 수행률)
+    board.students.push({
+      학생:v.학생, 수행:v.수행, 미수행:v.미수행,
+      수행률: rr, 담당: [...v.담당집].join(', '),
+      risky: (total>=minCnt && rr<th)
+    });
+  });
+
+  // 반별 수행률 및 학생 정렬(수행률 오름차순 → risky 우선 → 이름)
+  Object.values(classBoards).forEach(b=>{
+    b.classRate=rate(b.classDone,b.classMiss);
+    b.students.sort((a,b)=> ( (a.risky===b.risky) ? (a.수행률-b.수행률) : (a.risky? -1:1) ) || a.학생.localeCompare(b.학생,'ko'));
+  });
+
+  // 정렬: 리스크 많은 반 → 반이름
+  return Object.values(classBoards).sort((a,b)=> (b.riskCnt-a.riskCnt)||a.반.localeCompare(b.반,'ko'));
+}
+
+function renderAll(){
+  try{
+    clearErr();
+    // 교사 목록 동기화
+    const setT=new Set(RAW.map(r=>String(r['작성자']||'').trim()).filter(Boolean));
+    const teachers=[...setT].sort((a,b)=>a.localeCompare(b,'ko')); const curT=els.teacherSel.value;
+    els.teacherSel.innerHTML='<option value="__ALL__">전체</option>'+teachers.map(t=>`<option value="${t}">${t}</option>`).join('');
+    if([...els.teacherSel.options].some(o=>o.value===curT)) els.teacherSel.value=curT;
+
+    const boards=aggregateByClass(); els.grid.innerHTML='';
+    if(!boards.length){
+      els.grid.innerHTML = '<div class="col-span-full p-6 text-center text-sm text-slate-500 bg-white border rounded-xl">표시할 반이 없습니다. (기간/필터를 조정하거나 데이터를 불러오세요)</div>';
+      return;
+    }
+    boards.forEach(b=>{
+      const rateColor=b.classRate<50?'bg-red-500':(b.classRate<70?'bg-orange-500':'bg-emerald-500');
+      const card=document.createElement('details'); card.className='rounded-xl border bg-white'; card.open=false;
+      const sum=document.createElement('summary'); sum.className='summary hover:bg-slate-50 select-none';
+      sum.innerHTML=`
+        <div class="px-3 py-2 flex items-center gap-3">
+          <div class="font-semibold flex-1 truncate">${b.반}</div>
+          <div class="flex items-center gap-2 shrink-0"><span class="badge">리스크 ${b.riskCnt}</span><span class="badge">총 ${b.totalCnt}</span></div>
+        </div>
+        <div class="px-3 pb-2">
+          <div class="text-xs text-slate-500 mb-1">반 수행률 ${b.classRate}%</div>
+          <div class="bar"><span class="${rateColor}" style="width:${b.classRate}%;"></span></div>
+        </div>
+      `;
+      card.appendChild(sum);
+
+      const inner=document.createElement('div'); inner.className='px-3 pb-3 hidden';
+      const tbl=document.createElement('div'); tbl.className='border rounded mt-3';
+      tbl.innerHTML=`
+        <table class="min-w-full text-sm">
+          <thead class="sticky-th">
+            <tr>
+              <th class="text-left px-2 py-1">학생</th>
+              <th class="text-right px-2 py-1">수행률</th>
+              <th class="text-right px-2 py-1">미수행</th>
+              <th class="text-left px-2 py-1">담당</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>`;
+      const tbody=tbl.querySelector('tbody');
+      b.students.forEach(s=>{
+        const tr=document.createElement('tr');
+        const color=s.수행률<50?'text-red-600':(s.수행률<70?'text-orange-600':'text-slate-800');
+        const bold=s.risky?'font-semibold':'';
+        tr.innerHTML=`
+          <td class="px-2 py-1 ${bold}">${s.학생}</td>
+          <td class="px-2 py-1 text-right ${color} ${bold}">${s.수행률}%</td>
+          <td class="px-2 py-1 text-right ${bold}">${s.미수행}</td>
+          <td class="px-2 py-1 ${bold}">${s.담당}</td>`;
+        tbody.appendChild(tr);
+      });
+      inner.appendChild(tbl); card.appendChild(inner);
+      card.addEventListener('toggle',()=>{inner.classList.toggle('hidden',!card.open)});
+      els.grid.appendChild(card);
+    });
+  }catch(e){
+    showErr('렌더링 오류: '+(e?.message||e));
+    console.error(e);
+  }
+}
+
+// ===== 바인딩 =====
+function bindApp(){
+  els.startDate.addEventListener('change',()=>{updateBadge();renderAll()});
+  els.endDate.addEventListener('change',()=>{updateBadge();renderAll()});
+  bindRangeChips(); updateBadge();
+  ['threshold','minCnt','teacherSel'].forEach(id=>els[id].addEventListener('change',renderAll));
+  els.autoLoad.addEventListener('change',()=>{localStorage.setItem(LS_KEYS.autoload,els.autoLoad.checked?'1':'0')});
+  els.clearSaved.addEventListener('click',()=>{clearLocal();alert('저장된 데이터(메인)를 삭제했습니다.')});
+  els.fileInput.addEventListener('change',async e=>{
+    try{
+      const f=e.target.files[0]; if(!f) return;
+      const parsed=await parseFile(f);
+      RAW=(parsed||[]).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+      if(!RAW.length){ showErr('파일을 읽었지만 유효한 행이 없습니다. (헤더: 날짜/작성자/과목/반코드/학생명/상태)'); }
+      renderAll(); if(els.autoLoad.checked) saveData(RAW);
+    }catch(err){ showErr('파일 처리 오류: '+(err?.message||err)); console.error(err); }
+  });
+  // 자동불러오기만 시도
+  loadDataFromLocal();
+  renderAll();
+}
+document.addEventListener('DOMContentLoaded',bindApp);
+</script>
+</body>
+</html>

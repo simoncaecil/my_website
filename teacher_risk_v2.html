@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>선생님별 리스크 학생 추출 (v3.0 · 조치사항·실행일자만)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .chip{border:1px solid #e2e8f0;border-radius:9999px;padding:6px 10px;font-size:12px;background:#f8fafc}
+    .chip.active{background:#111827;color:#fff;border-color:#111827}
+    .sticky-th th{position:sticky;top:0;background:#f8fafc}
+    details>summary::-webkit-details-marker{display:none}
+    .summary-btn{cursor:pointer}
+    .err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-7xl mx-auto p-4">
+    <header class="mb-4 flex items-center gap-2">
+      <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드로</a>
+      <h1 class="text-2xl font-bold">선생님별 리스크 학생 추출</h1>
+      <span class="ml-auto text-xs text-slate-500">리스크 높은 순(수행률 낮은 순) 정렬</span>
+      <a href="./class_grid_risk.html"
+         class="ml-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">반별 리스크</a>
+    </header>
+
+    <div id="errbox" class="hidden err rounded-lg p-3 mb-3 text-sm"></div>
+
+    <!-- 필터 박스 -->
+    <section class="mb-4 bg-white rounded-xl shadow p-4">
+      <div class="flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-xs font-medium mb-1">시작일</label>
+          <input id="startDate" type="date" class="w-44 rounded-lg border-slate-300" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium mb-1">종료일</label>
+          <input id="endDate" type="date" class="w-44 rounded-lg border-slate-300" />
+        </div>
+        <div class="grow">
+          <div class="text-xs font-medium mb-1">빠른 선택</div>
+          <div class="flex flex-wrap gap-2">
+            <button class="chip" id="rngAll">전체</button>
+            <button class="chip" id="rngToday">오늘</button>
+            <button class="chip" id="rngWeekMon">이번주(월~일)</button>
+            <button class="chip" id="rngMonth">이번달</button>
+            <button class="chip" id="rngLastWeek">지난주</button>
+            <button class="chip" id="rngLastMonth">지난달</button>
+          </div>
+        </div>
+        <div class="ml-auto text-right">
+          <div class="text-xs text-slate-500 mb-1">선택된 기간</div>
+          <div id="rangeBadge" class="inline-block chip">전체</div>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-xs font-medium mb-1">임계값(수행률 % 미만)</label>
+          <input id="threshold" type="number" min="0" max="100" value="70" class="w-24 rounded-lg border-slate-300 text-right" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium mb-1">선생님</label>
+          <select id="teacherSel" class="w-56 rounded-lg border-slate-300">
+            <option value="__ALL__">전체</option>
+          </select>
+        </div>
+        <div class="grow">
+          <label class="block text-xs font-medium mb-1">검색(학생/반/과목 포함)</label>
+          <input id="search" placeholder="예: 재훈, MWF-5A, LA" class="rounded-lg border px-2 py-1 text-sm w-full"/>
+        </div>
+        <div class="ml-auto">
+          <div class="text-xs font-medium mb-1">정렬</div>
+          <select id="sortSel" class="rounded-lg border-slate-300 text-sm">
+            <option value="risk">리스크 높은 순(수행률 오름차순)</option>
+            <option value="miss">미수행 많은 순</option>
+            <option value="name">학생명 오름차순</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium mb-1">최소 기록 수</label>
+          <input id="minCnt" type="number" min="1" value="3" class="w-20 rounded-lg border-slate-300 text-right"/>
+        </div>
+        <span class="text-sm text-slate-500 ml-auto" id="countTotal"></span>
+      </div>
+    </section>
+<!-- ▼▼▼ KPI 박스: 필터 섹션 바로 아래에 붙여넣기 ▼▼▼ -->
+<section id="kpi" class="mb-4 hidden">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="p-3 bg-white rounded-xl border">
+      <div class="text-xs text-slate-500">재발률(조치 후 30일)</div>
+      <div id="kpi-recid" class="text-2xl font-bold mt-1">-</div>
+      <div id="kpi-recid-sub" class="text-xs text-slate-500 mt-1"></div>
+    </div>
+    <div class="p-3 bg-white rounded-xl border">
+      <div class="text-xs text-slate-500">종료율(교사)</div>
+      <div id="kpi-close-teacher" class="text-2xl font-bold mt-1">-</div>
+      <div class="text-xs text-slate-500 mt-1">상세는 아래 표 참고</div>
+    </div>
+    <div class="p-3 bg-white rounded-xl border">
+      <div class="text-xs text-slate-500">종료율(반/과목)</div>
+      <div id="kpi-close-class" class="text-2xl font-bold mt-1">-</div>
+      <div class="text-xs text-slate-500 mt-1">상세는 아래 표 참고</div>
+    </div>
+  </div>
+
+  <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div id="tbl-close-teacher" class="p-3 bg-white rounded-xl border"></div>
+    <div id="tbl-close-class" class="p-3 bg-white rounded-xl border"></div>
+    <div id="tbl-close-subj" class="p-3 bg-white rounded-xl border"></div>
+  </div>
+</section>
+<!-- ▲▲▲ KPI 박스 끝 ▲▲▲ -->
+
+    <!-- 결과 렌더 -->
+    <section id="wrap"></section>
+
+    <!-- 데이터 업로드 / 로딩 -->
+    <div class="fixed bottom-4 right-4">
+      <div class="bg-white rounded-xl shadow-lg p-3 flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <input type="file" accept=".xlsx,.csv" id="fileInput" class="block text-sm" />
+          <label class="inline-flex items-center gap-1 text-xs">
+            <input id="autoLoad" type="checkbox" class="rounded border" /> 자동불러오기
+          </label>
+          <button id="clearSaved" class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장삭제</button>
+        </div>
+        <div class="w-px h-6 bg-slate-300"></div>
+        <div class="flex items-center gap-2">
+          <input type="file" accept=".xlsx,.csv" id="followInput" class="block text-xs" />
+          <button id="exportFollow" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">조치 CSV 내보내기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========= 기본 저장 키 ========= */
+const LS_KEYS = {
+  autoload:'lancon_autoload',
+  data:'lancon_data_json',
+  savedAt:'lancon_saved_at',
+  follow:'lancon_followups_json_v30',
+  followSavedAt:'lancon_followups_saved_at_v30'
+};
+
+/* ========= 전역 ========= */
+let RAW = [];      // 활동 로그
+let FOLLOWS = [];  // 조치 테이블(간소화)
+
+/* ========= DOM ========= */
+const $ = (id) => document.getElementById(id);
+const els = {
+  startDate: $('startDate'), endDate: $('endDate'),
+  rngAll: $('rngAll'), rngToday: $('rngToday'), rngWeekMon: $('rngWeekMon'),
+  rngMonth: $('rngMonth'), rngLastWeek: $('rngLastWeek'), rngLastMonth: $('rngLastMonth'),
+  rangeBadge: $('rangeBadge'), threshold: $('threshold'),
+  teacherSel: $('teacherSel'), search: $('search'), sortSel: $('sortSel'), minCnt: $('minCnt'),
+  countTotal: $('countTotal'), wrap: $('wrap'),
+  fileInput: $('fileInput'), autoLoad: $('autoLoad'), clearSaved: $('clearSaved'),
+  followInput: $('followInput'), exportFollow: $('exportFollow'),
+  errbox: $('errbox')
+};
+
+/* ========= 유틸 ========= */
+function showErr(msg){ els.errbox.textContent = msg; els.errbox.classList.remove('hidden'); console.error(msg); }
+function clearErr(){ els.errbox.classList.add('hidden'); els.errbox.textContent=''; }
+function fmtYMD(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`}
+function todayYMD(){return fmtYMD(new Date());}
+function parseDate(v){
+  if(v==null||v==='')return null;
+  if(typeof v==='number'){ try{const d=XLSX.SSF.parse_date_code(v);return new Date(d.y,d.m-1,d.d);}catch{return null} }
+  const s=String(v).trim().replace(/[.\/]/g,'-');
+  const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(s); return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function inRange(d,{s,e}){ if(!d) return false; if(s&&d<s) return false; if(e&&d>e) return false; return true; }
+function normalizeStatus(v){
+  const s=String(v||'').trim();
+  if(/과제안함|미수행|결석/.test(s)) return '미수행';
+  if(/^\d+$/.test(s)) return (+s)>=1?'수행':'미수행';
+  if(/^\d+%$/.test(s)) return parseInt(s,10)>=1?'수행':'미수행';
+  return '기타';
+}
+function mapRecord(r){
+  const c={}; for(const k in r){const nk=String(k).replace(/\ufeff/g,'').trim(); const v=r[k]; c[nk]=(typeof v==='string')?v.trim():v;}
+  const o={
+    '날짜':c['날짜']??c['date']??c['Date']??'',
+    '작성자':c['작성자']??c['선생님']??c['Teacher']??'',
+    '과목':c['과목']??c['제목']??c['유형']??c['subject']??'',
+    '반코드':c['반코드']??c['반명']??c['반']??c['class']??'',
+    '학생명':c['학생명']??c['학생']??c['이름']??c['student']??'',
+    '상태':c['상태']??c['구분']??c['점수']??c['점수/비고']??c['결과']??''
+  };
+  for(const k in o){ if(typeof o[k]==='string') o[k]=o[k].trim(); }
+  return o;
+}
+function rate(done,miss){ return Math.round((done/((done+miss)||1))*100); }
+
+/* ========= 로컬 저장 ========= */
+function saveData(rows){ localStorage.setItem(LS_KEYS.data, JSON.stringify(rows)); localStorage.setItem(LS_KEYS.savedAt, new Date().toISOString()); }
+function loadDataFromLocal(){
+  const flag=localStorage.getItem(LS_KEYS.autoload)==='1'; els.autoLoad.checked=flag;
+  const json=localStorage.getItem(LS_KEYS.data);
+  if(flag && json){ try{ const rows=JSON.parse(json); if(Array.isArray(rows)&&rows.length){ RAW=rows; return true; } }catch(e){ showErr('저장 데이터 읽기 오류: '+e.message); } }
+  return false;
+}
+function clearLocal(){ localStorage.removeItem(LS_KEYS.data); localStorage.removeItem(LS_KEYS.savedAt); }
+function saveFollows(rows){ localStorage.setItem(LS_KEYS.follow, JSON.stringify(rows)); localStorage.setItem(LS_KEYS.followSavedAt, new Date().toISOString()); }
+function loadFollowsFromLocal(){ const json=localStorage.getItem(LS_KEYS.follow); if(!json) return false; try{const arr=JSON.parse(json); if(Array.isArray(arr)){ FOLLOWS=arr; return true; }}catch(e){ showErr('조치 데이터 읽기 오류: '+e.message);} return false; }
+
+/* ========= CSV/XLSX 파싱 ========= */
+async function parseFile(file){
+  const isCSV=/\.csv$/i.test(file.name||'');
+  try{
+    if(isCSV){ const text=await file.text(); let json=readCSVText(text); if((!json||!json.length)&&text.charCodeAt(0)===0xFEFF) json=readCSVText(text.slice(1)); return json||[]; }
+    else{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const first=wb.SheetNames[0]; const ws1=wb.Sheets[first];
+      const rows1=XLSX.utils.sheet_to_json(ws1,{defval:'',raw:false});
+      const followSheet=wb.Sheets['조치 테이블'];
+      const rows2= followSheet ? XLSX.utils.sheet_to_json(followSheet,{defval:'',raw:false}) : null;
+      return {main:rows1, follow:rows2};
+    }
+  }catch(e){ showErr('파일 파싱 실패: '+e.message); return []; }
+}
+function readCSVText(text){
+  try{
+    const first=(text.split(/\r?\n/).find(l=>l.trim().length>0)||'');
+    const cnt={comma:(first.match(/,/g)||[]).length, tab:(first.match(/\t/g)||[]).length, semi:(first.match(/;/g)||[]).length};
+    let n=text; if(cnt.tab>cnt.comma&&cnt.tab>=cnt.semi) n=text.replace(/\t/g,','); else if(cnt.semi>cnt.comma&&cnt.semi>cnt.tab) n=text.replace(/;/g,',');
+    n=n.replace(/\r\n/g,'\n');
+    const wb=XLSX.read(n,{type:'string'}); const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  }catch(e){ showErr('CSV 파싱 실패: '+e.message); return null; }
+}
+
+/* ========= 서버 예시(선택) ========= */
+async function loadFromServer(){
+  try{
+    const res=await fetch('example01.csv',{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text=await res.text();
+    let json=readCSVText(text); if(!json||!json.length) throw new Error('CSV 내용이 비어있음');
+    RAW=(json||[]).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+    renderAll();
+  }catch(e){ console.warn('서버 데이터 로드 실패',e); }
+}
+
+/* ========= 범위/필터 ========= */
+function getRange(){ const sd=els.startDate.value, ed=els.endDate.value; const s=sd?new Date(sd+'T00:00:00'):null; const e=ed?new Date(ed+'T23:59:59.999'):null; return {s,e}; }
+function updateBadge(){ const sd=els.startDate.value, ed=els.endDate.value; els.rangeBadge.textContent=(!sd&&!ed)?'전체':`${sd||'..'} ~ ${ed||'..'}` }
+function setRange(s,e){ els.startDate.value=s?fmtYMD(s):''; els.endDate.value=e?fmtYMD(e):''; updateBadge(); renderAll(); }
+function bindRangeChips(){
+  const today=new Date();
+  els.rngAll.onclick=()=>{ setRange(null,null); actChip(els.rngAll); };
+  els.rngToday.onclick=()=>{ setRange(today,today); actChip(els.rngToday); };
+  els.rngWeekMon.onclick=()=>{ const d=new Date(); const day=(d.getDay()+6)%7; const s=new Date(d); s.setDate(d.getDate()-day); const e=new Date(s); e.setDate(s.getDate()+6); setRange(s,e); actChip(els.rngWeekMon); };
+  els.rngMonth.onclick=()=>{ const d=new Date(); const s=new Date(d.getFullYear(),d.getMonth(),1); const e=new Date(d.getFullYear(),d.getMonth()+1,0); setRange(s,e); actChip(els.rngMonth); };
+  els.rngLastWeek.onclick=()=>{ const d=new Date(); const day=(d.getDay()+6)%7; const e=new Date(d); e.setDate(d.getDate()-day-1); const s=new Date(e); s.setDate(e.getDate()-6); setRange(s,e); actChip(els.rngLastWeek); };
+  els.rngLastMonth.onclick=()=>{ const d=new Date(); const s=new Date(d.getFullYear(),d.getMonth()-1,1); const e=new Date(d.getFullYear(),d.getMonth(),0); setRange(s,e); actChip(els.rngLastMonth); };
+}
+function actChip(el){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el?.classList.add('active'); }
+
+/* ========= 교사 목록/리스크 행 ========= */
+function prepareTeachers(){
+  const set=new Set(RAW.map(r=>String(r['작성자']||'').trim()).filter(Boolean));
+  const list=[...set].sort((a,b)=>a.localeCompare(b));
+  const sel=els.teacherSel, cur=sel.value;
+  sel.innerHTML='<option value="__ALL__">전체</option>'+list.map(t=>`<option value="${t}">${t}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  return list;
+}
+function computeRiskRows(range, teacherFilter){
+  const bucket={};
+  RAW.forEach(r=>{
+    const d=parseDate(r['날짜']); if(!inRange(d,range)) return;
+    const t=(r['작성자']||'').trim(); if(teacherFilter!=='__ALL__'&&t!==teacherFilter) return;
+    const st=normalizeStatus(r['상태']);
+    const key=[r['학생명']||'', r['반코드']||'', t].join('|');
+    bucket[key] ??= {학생:r['학생명']||'', 반:r['반코드']||'', 선생님:t, 수행:0, 미수행:0, 과목집:new Set()};
+    if(r['과목']) bucket[key].과목집.add(r['과목']);
+    if(st==='수행') bucket[key].수행++; else if(st==='미수행') bucket[key].미수행++;
+  });
+  const th=Math.max(0,Math.min(100,+els.threshold.value||70));
+  const minCnt=Math.max(1,+els.minCnt.value||1);
+  const q=(els.search.value||'').trim().toLowerCase();
+
+  let rows=Object.values(bucket).map(v=>({
+    ...v, 과목:[...v.과목집].join(', '),
+    수행률:rate(v.수행,v.미수행), 총건수:v.수행+v.미수행
+  })).filter(v=> v.총건수>=minCnt && v.수행률<th);
+
+  if(q) rows=rows.filter(r=> `${r.학생} ${r.반} ${r.선생님} ${r.과목}`.toLowerCase().includes(q));
+
+  const sortSel=els.sortSel.value;
+  rows.sort((a,b)=>{
+    if(sortSel==='name') return a.학생.localeCompare(b.학생);
+    if(sortSel==='miss') return (b.미수행-a.미수행)||(a.수행률-b.수행률)||a.학생.localeCompare(b.학생);
+    return (a.수행률-b.수행률)||(b.미수행-a.미수행)||a.학생.localeCompare(b.학생);
+  });
+  return rows;
+}
+
+/* ========= 조치 테이블(간소화) ========= */
+/* 스키마: 학생명,반코드,작성자,조치사항,실행일자 */
+const FOLLOW_COLUMNS = ['학생명','반코드','작성자','조치사항','실행일자','완료']; // ← 완료 추가 (Y/N)
+
+function cleanFollow(r){
+  const c={}; for(const k in r){ const nk=String(k).replace(/\ufeff/g,'').trim(); const v=r[k]; c[nk]=(typeof v==='string')?v.trim():v; }
+  const o={}; FOLLOW_COLUMNS.forEach(k=> o[k]=(c[k]??'').toString().trim());
+  if(o['실행일자']){ const d=parseDate(o['실행일자']); o['실행일자'] = d? fmtYMD(d) : ''; }
+  // ▼ 신규: 완료 필드 정규화
+  o['완료'] = (o['완료']||'').toUpperCase()==='Y' ? 'Y' : 'N';
+  return o;
+}
+function addFollow(row){ FOLLOWS.push(row); saveFollows(FOLLOWS); }
+function getStudentFollows(name, cls, teacher){
+  return FOLLOWS.filter(f=> f['학생명']===name && (f['반코드']||'')===(cls||'') && (f['작성자']||'')===(teacher||''))
+                .sort((a,b)=> (parseDate(b['실행일자']) - parseDate(a['실행일자'])) );
+}
+
+/* ========= 렌더 ========= */
+function renderTeacherSection(teacher, rows){
+  const wrap=document.createElement('section');
+  wrap.className='mb-5';
+  const cnt=rows.length;
+  const sum=document.createElement('details');
+  sum.open=true;
+  sum.className='bg-white rounded-xl shadow overflow-hidden';
+  sum.insertAdjacentHTML('afterbegin',`
+    <summary class="summary-btn select-none px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold">${cnt}</span>
+        <h2 class="font-semibold">${teacher||'(미지정)'}</h2>
+      </div>
+      <div class="text-xs text-slate-500">임계값 미만 학생 수 • 클릭하여 접기/펼치기</div>
+    </summary>
+  `);
+
+  const inner=document.createElement('div'); inner.className='px-4 pb-4';
+
+  if(!cnt){
+    inner.innerHTML=`<div class="p-6 text-sm text-slate-500">조건에 해당하는 학생이 없습니다.</div>`;
+    sum.appendChild(inner); wrap.appendChild(sum); return wrap;
+  }
+
+  const grid=document.createElement('div'); grid.className='grid grid-cols-1 md:grid-cols-2 gap-3';
+
+  rows.forEach(v=>{
+    const card=document.createElement('div');
+    card.className='p-4 bg-white rounded-xl border';
+    card.innerHTML=`
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-lg font-semibold leading-tight truncate">${v.학생}</div>
+          <div class="text-xs text-slate-500">반 ${v.반} · 담당 ${v.선생님}</div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-xs text-slate-500">수행 ${v.수행} · 미수행 ${v.미수행}</div>
+          <div class="text-base font-semibold ${v.수행률<50?'text-red-600':(v.수행률<70?'text-orange-600':'text-slate-800')}">수행률 ${v.수행률}%</div>
+        </div>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 gap-3">
+        <div>
+          <div class="font-medium text-sm mb-1">최근 미수행</div>
+          <div class="max-h-40 overflow-auto border rounded">
+            <table class="min-w-full text-sm">
+              <thead class="sticky-th"><tr>
+                <th class="text-left px-2 py-1">날짜</th>
+                <th class="text-left px-2 py-1">반</th>
+                <th class="text-left px-2 py-1">과목</th>
+              </tr></thead>
+              <tbody class="miss-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="border rounded p-2">
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-medium text-sm">조치 기록</div>
+            <div class="text-xs text-slate-500">${(getStudentFollows(v.학생, v.반, v.선생님)[0]?.['실행일자']||'등록 없음')}</div>
+          </div>
+          <div class="max-h-36 overflow-auto">
+            <table class="min-w-full text-xs">
+              <thead class="sticky-th">
+  <tr>
+    <th class="text-left px-2 py-1">실행일자</th>
+    <th class="text-left px-2 py-1">조치사항</th>
+    <th class="text-left px-2 py-1">완료</th> <!-- 신규 -->
+  </tr>
+</thead>
+
+              <tbody class="follow-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="mt-2 grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+            <div>
+              <label class="block text-xs">실행일자</label>
+              <input type="date" class="add-date rounded border w-full px-2 py-1 text-xs" />
+            </div>
+            <div class="md:col-span-4">
+              <label class="block text-xs">조치사항</label>
+              <input type="text" class="add-desc rounded border w-full px-2 py-1 text-xs" placeholder="예: 개별코칭 10분, 추가과제 안내 등"/>
+            </div>
+            <div class="md:col-span-1 flex items-end">
+              <button class="add-save px-2 py-1 rounded bg-indigo-600 text-white text-xs w-full">추가</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 최근 미수행 표 채우기
+    const missBody=card.querySelector('.miss-tbody');
+    const range=getRange();
+    const misses=RAW.filter(r=>
+      r['학생명']===v.학생 && (r['반코드']||'')===(v.반||'') && (r['작성자']||'')===(v.선생님||'') &&
+      normalizeStatus(r['상태'])==='미수행' && inRange(parseDate(r['날짜']),range)
+    ).sort((a,b)=>parseDate(b['날짜'])-parseDate(a['날짜'])).slice(0,20);
+    misses.forEach(m=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="px-2 py-1">${fmtYMD(parseDate(m['날짜']))}</td><td class="px-2 py-1">${m['반코드']||''}</td><td class="px-2 py-1">${m['과목']||''}</td>`;
+      missBody.appendChild(tr);
+    });
+
+    // 조치 기록 표 채우기
+const fBody=card.querySelector('.follow-tbody');
+getStudentFollows(v.학생,v.반,v.선생님).forEach(f=>{
+  const tr=document.createElement('tr');
+  const id = [f['학생명'],f['반코드'],f['작성자'],f['실행일자'],f['조치사항']].join('|'); // 간단 키
+  tr.innerHTML=`
+    <td class="px-2 py-1">${f['실행일자']||''}</td>
+    <td class="px-2 py-1">${f['조치사항']||''}</td>
+    <td class="px-2 py-1">
+      <input type="checkbox" data-id="${id}" class="follow-done rounded border" ${f['완료']==='Y'?'checked':''}/>
+    </td>`;
+  fBody.appendChild(tr);
+});
+// 완료 토글 이벤트 위임
+fBody.addEventListener('change', (e)=>{
+  const cb = e.target.closest('.follow-done'); if(!cb) return;
+  const id = cb.dataset.id;
+  const idx = FOLLOWS.findIndex(x => [x['학생명'],x['반코드'],x['작성자'],x['실행일자'],x['조치사항']].join('|')===id);
+  if(idx>=0){ FOLLOWS[idx]['완료'] = cb.checked ? 'Y' : 'N'; saveFollows(FOLLOWS); renderKPIs(); }
+});
+
+
+    // 기본값
+    const dateInput=card.querySelector('.add-date'); dateInput.value=todayYMD();
+
+    // 저장
+    card.querySelector('.add-save').addEventListener('click',()=>{
+const row = {
+  '학생명': v.학생, '반코드': v.반, '작성자': v.선생님,
+  '조치사항': card.querySelector('.add-desc').value.trim(),
+  '실행일자': card.querySelector('.add-date').value || todayYMD(),
+  '완료': 'N'
+};
+
+      if(!row['조치사항']){ alert('조치사항을 입력하세요.'); return; }
+      const cleaned=cleanFollow(row);
+      addFollow(cleaned);
+      renderAll(); // 갱신
+    });
+
+    grid.appendChild(card);
+  });
+
+  inner.appendChild(grid);
+  sum.appendChild(inner);
+  wrap.appendChild(sum);
+  return wrap;
+}
+// === KPI 도우미 함수들 ===
+function percent(n,d){ return (d? Math.round(n*1000/d)/10 : 0).toFixed(1) + '%'; }
+
+// 과목 추정: '실행일자' 기준 직전 14일 내 가장 가까운 미수행의 과목
+function inferSubjectForFollow(f){
+  const exec = parseDate(f['실행일자']); if(!exec) return '';
+  const cand = RAW.filter(r=>{
+    if(r['학생명']!==f['학생명']) return false;
+    if((r['반코드']||'')!==(f['반코드']||'')) return false;
+    if((r['작성자']||'')!==(f['작성자']||'')) return false;
+    if(normalizeStatus(r['상태'])!=='미수행') return false;
+    const d=parseDate(r['날짜']); if(!d) return false;
+    const diff=(exec - d)/86400000;
+    return diff>=0 && diff<=14;
+  }).sort((a,b)=> parseDate(b['날짜'])-parseDate(a['날짜']))[0];
+  return cand ? (cand['과목']||'') : '';
+}
+
+// 재발 여부: 조치 후 30일 내 미수행 발생?
+function isRecidWithin30(f){
+  const start = parseDate(f['실행일자']); if(!start) return false;
+  const end = new Date(start); end.setDate(end.getDate()+30);
+  return RAW.some(r=>{
+    if(r['학생명']!==f['학생명']) return false;
+    if((r['반코드']||'')!==(f['반코드']||'')) return false;
+    if((r['작성자']||'')!==(f['작성자']||'')) return false;
+    if(normalizeStatus(r['상태'])!=='미수행') return false;
+    const d=parseDate(r['날짜']); if(!d) return false;
+    return d>=start && d<=end;
+  });
+}
+
+// KPI 계산(전체 조치 기준)
+function computeKPIs(){
+  const rows = FOLLOWS || [];
+  const total = rows.length;
+  const recid = rows.filter(isRecidWithin30).length;
+
+  // 집계 유틸
+  const agg = (keyFn) => {
+    const map = new Map();
+    rows.forEach(f=>{
+      const key = keyFn(f);
+      if(!key) return;
+      const m = map.get(key) || {done:0, total:0};
+      // '완료' 컬럼이 없다면 기본 N으로 취급
+      const doneFlag = ((f['완료']||'N').toUpperCase()==='Y');
+      m.total += 1;
+      if(doneFlag) m.done += 1;
+      map.set(key, m);
+    });
+    return [...map.entries()]
+      .map(([k,v])=>({key:k, ...v, rate: v.total? (v.done/v.total):0 }))
+      .sort((a,b)=> b.rate - a.rate || b.total - a.total || a.key.localeCompare(b.key,'ko'));
+  };
+
+  const byTeacher = agg(f=> f['작성자']||'');
+  const byClass   = agg(f=> f['반코드']||'');
+  const bySubject = agg(f=> {
+    const s = inferSubjectForFollow(f);
+    return s || '';
+  });
+
+  return {total, recid, byTeacher, byClass, bySubject};
+}
+
+// KPI 화면에 뿌리기
+function renderKPIs(){
+  const k = computeKPIs();
+  const kpi = document.getElementById('kpi');
+  kpi.classList.toggle('hidden', (k.total===0));
+
+  // 숫자
+  document.getElementById('kpi-recid').textContent = k.total? percent(k.recid, k.total) : '-';
+  document.getElementById('kpi-recid-sub').textContent = k.total? `${k.recid} / ${k.total}건` : '';
+
+  const sum = arr => arr.reduce((a,c)=>a+c,0);
+  const teacherDone = sum(k.byTeacher.map(x=>x.done));
+  const teacherTotal= sum(k.byTeacher.map(x=>x.total));
+  const classDone   = sum(k.byClass.map(x=>x.done));
+  const classTotal  = sum(k.byClass.map(x=>x.total));
+
+  document.getElementById('kpi-close-teacher').textContent = teacherTotal? percent(teacherDone, teacherTotal) : '-';
+  document.getElementById('kpi-close-class').textContent   = classTotal? percent(classDone, classTotal) : '-';
+
+  // 표 빌더
+  const buildTable = (title, rows) => {
+    if(!rows.length) return `<div class="text-sm text-slate-500">${title}: 데이터 없음</div>`;
+    const head = `<div class="text-sm font-medium mb-2">${title}</div>
+      <table class="min-w-full text-xs"><thead class="sticky-th">
+        <tr><th class="text-left px-2 py-1">구분</th><th class="text-right px-2 py-1">완료율</th><th class="text-right px-2 py-1">완료/전체</th></tr>
+      </thead><tbody>`;
+    const body = rows.map(r=> `<tr>
+      <td class="px-2 py-1">${r.key||'(없음)'}</td>
+      <td class="px-2 py-1 text-right">${percent(r.done, r.total)}</td>
+      <td class="px-2 py-1 text-right">${r.done} / ${r.total}</td>
+    </tr>`).join('');
+    return head + body + '</tbody></table>';
+  };
+
+  document.getElementById('tbl-close-teacher').innerHTML = buildTable('교사별 종료율', k.byTeacher);
+  document.getElementById('tbl-close-class').innerHTML   = buildTable('반별 종료율', k.byClass);
+  document.getElementById('tbl-close-subj').innerHTML    = buildTable('과목별 종료율(추정)', k.bySubject);
+}
+
+function renderAll(){
+  clearErr();
+  const list=prepareTeachers();
+  els.wrap.innerHTML='';
+
+  const teacherFilter=els.teacherSel.value;
+  const range=getRange();
+
+  let totalCount=0;
+  if(teacherFilter==='__ALL__'){
+    list.forEach(t=>{
+      const rows=computeRiskRows(range,t);
+      totalCount+=rows.length;
+      els.wrap.appendChild(renderTeacherSection(t,rows));
+    });
+  }else{
+    const rows=computeRiskRows(range,teacherFilter);
+    totalCount=rows.length;
+    els.wrap.appendChild(renderTeacherSection(teacherFilter,rows));
+  }
+  els.countTotal.textContent=`총 ${totalCount}명`;
+  renderKPIs();
+}
+
+/* ========= 바인딩 ========= */
+function bindApp(){
+  els.startDate.addEventListener('change',()=>{updateBadge();renderAll();});
+  els.endDate.addEventListener('change',()=>{updateBadge();renderAll();});
+  bindRangeChips(); updateBadge();
+
+  els.threshold.addEventListener('change',renderAll);
+  els.sortSel.addEventListener('change',renderAll);
+  els.minCnt.addEventListener('change',renderAll);
+  els.teacherSel.addEventListener('change',renderAll);
+  els.search.addEventListener('input',()=>{clearTimeout(els.search._t); els.search._t=setTimeout(renderAll,120);});
+
+  els.autoLoad.addEventListener('change',()=>{localStorage.setItem(LS_KEYS.autoload,els.autoLoad.checked?'1':'0');});
+  els.clearSaved.addEventListener('click',()=>{clearLocal();alert('저장된 데이터(메인)를 삭제했습니다.');});
+
+  // 활동 로그 불러오기 (CSV or XLSX 첫 시트)
+  els.fileInput.addEventListener('change', async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const parsed=await parseFile(f);
+    if(parsed && parsed.main!==undefined){ // XLSX
+      RAW=(parsed.main||[]).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+      FOLLOWS=(parsed.follow||[]).map(cleanFollow); // '조치 테이블' 시트가 있으면 읽음
+    }else{ // CSV
+      RAW=(parsed||[]).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+    }
+    if(!RAW.length){ showErr('파일을 읽었지만 유효한 행이 없습니다. (헤더: 날짜/작성자/과목/반코드/학생명/상태)'); }
+    saveData(RAW); if(FOLLOWS.length) saveFollows(FOLLOWS);
+    renderAll();
+  });
+
+  // 조치 테이블 별도 불러오기 (CSV or XLSX의 '조치 테이블' 시트)
+  els.followInput.addEventListener('change', async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const parsed=await parseFile(f);
+    if(parsed && parsed.follow!==undefined){ // XLSX의 '조치 테이블'
+      FOLLOWS=(parsed.follow||[]).map(cleanFollow);
+    }else{ // CSV
+      FOLLOWS=(parsed||[]).map(cleanFollow);
+    }
+    saveFollows(FOLLOWS);
+    renderAll();
+  });
+
+  // 내보내기
+  els.exportFollow.addEventListener('click',()=>{
+    const header= ['학생명','반코드','작성자','조치사항','실행일자','완료'];
+    const rows=FOLLOWS.length?FOLLOWS:[];
+    const arr=[header].concat(rows.map(r=> header.map(h=> (r[h]??'').toString().replace(/"/g,'""') )));
+    const csv=arr.map(cols=> cols.map(v=> `"${v}"`).join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='조치_테이블.csv'; document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  if(!loadDataFromLocal()){ loadFromServer(); }
+  loadFollowsFromLocal();
+  renderAll();
+}
+
+function actChip(el){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el?.classList.add('active'); }
+document.addEventListener('DOMContentLoaded',bindApp);
+</script>
+</body>
+</html>
