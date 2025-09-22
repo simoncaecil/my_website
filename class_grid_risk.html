@@ -89,6 +89,26 @@ function clearLocal(){localStorage.removeItem(LS_KEYS.data);localStorage.removeI
 async function parseFile(file){const isCSV=/\.csv$/i.test(file.name||'');try{if(isCSV){const text=await file.text();let json=readCSVText(text);if((!json||!json.length)&&text.charCodeAt(0)===0xFEFF)json=readCSVText(text.slice(1));return json||[]}else{const buf=await file.arrayBuffer();return readArray(buf)||[]}}catch(e){showErr('파일 파싱 실패: '+e.message);return[]}} 
 function readCSVText(text){try{const first=(text.split(/\r?\n/).find(l=>l.trim().length>0)||'');const cnt={comma:(first.match(/,/g)||[]).length,tab:(first.match(/\t/g)||[]).length,semi:(first.match(/;/g)||[]).length};let n=text;if(cnt.tab>cnt.comma&&cnt.tab>=cnt.semi)n=text.replace(/\t/g,',');else if(cnt.semi>cnt.comma&&cnt.semi>cnt.tab)n=text.replace(/;/g,',');n=n.replace(/\r\n/g,'\n');const wb=XLSX.read(n,{type:'string'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('CSV 파싱 실패: '+e.message);return null}}
 function readArray(buf){try{const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('바이너리 읽기 실패: '+e.message);return null}}
+<script>
+// ...위쪽 코드들...
+
+/* ===== 서버 CSV 불러오기 (Netlify 배포용) ===== */
+async function loadFromServer(){
+  try{
+    const res = await fetch('example01.csv', { cache: 'no-store' });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const json = readCSVText(text);         // class_grid_risk에 이미 있는 CSV 파서 재사용
+    RAW = (json||[])
+      .map(mapRecord)
+      .filter(r => Object.values(r).some(v => String(v??'').trim()!==''));
+    renderAll();
+  }catch(e){
+    showErr('서버 데이터 로드 실패: ' + (e?.message||e));
+    console.error(e);
+  }
+}
+</script>
 
 // ===== 범위/보조 =====
 const getRange=()=>{const sd=els.startDate.value,ed=els.endDate.value;const s=sd?new Date(sd+'T00:00:00'):null;const e=ed?new Date(ed+'T23:59:59.999'):null;return{s,e}};
@@ -208,21 +228,7 @@ function renderAll(){
 }
 
 // ===== 바인딩 =====
-async function loadFromServer(){
-  try{
-    const url = new URL('example01.csv', location.href);
-    const res = await fetch(url.toString(), {cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    let text = await res.text();
-    if (text.charCodeAt(0)===0xFEFF) text = text.slice(1);
-    let json = readCSVText(text);
-    RAW = (json || []).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
-  }catch(e){
-    showErr('서버 데이터 로드 실패: '+(e?.message||e));
-    console.error(e);
-  }
-}
-async function bindApp(){
+function bindApp(){
   els.startDate.addEventListener('change',()=>{updateBadge();renderAll()});
   els.endDate.addEventListener('change',()=>{updateBadge();renderAll()});
   bindRangeChips(); updateBadge();
@@ -238,10 +244,11 @@ async function bindApp(){
       renderAll(); if(els.autoLoad.checked) saveData(RAW);
     }catch(err){ showErr('파일 처리 오류: '+(err?.message||err)); console.error(err); }
   });
-  // 자동불러오기 시도 + 서버 자동로딩
-  const hadLocal = loadDataFromLocal();
-  if(!hadLocal){ await loadFromServer(); }
-  renderAll();
++  // 자동불러오기 또는 서버 CSV 로드
++  if(!loadDataFromLocal()){ 
++    loadFromServer(); 
++  } else { 
++    renderAll(); 
 }
 document.addEventListener('DOMContentLoaded',bindApp);
 </script>
