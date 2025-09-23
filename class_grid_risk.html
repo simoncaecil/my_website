@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>반별 리스크 그리드 (v2.7 · 4열 · 요약에 수행률 표시)</title>
+  <title>반별 리스크 그리드 (v2.9 · BOM/CSV/날짜 파싱 강화)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS for robust CSV/XLSX parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .chip{border:1px solid #e2e8f0;border-radius:9999px;padding:6px 10px;font-size:12px;background:#f8fafc}
@@ -14,241 +15,417 @@
     .badge{font-size:11px;border:1px solid #e5e7eb;border-radius:9999px;padding:2px 8px;background:#f9fafb}
     details>summary::-webkit-details-marker{display:none}
     .summary{cursor:pointer}
-    .bar{height:10px;border-radius:9999px;background:#e5e7eb;overflow:hidden}
-    .bar>span{display:block;height:100%}
+    .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    @media(max-width:1280px){.grid-4{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:1024px){.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:640px){.grid-4{grid-template-columns:repeat(1,minmax(0,1fr))}}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden}
+    .card-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #eef2f7}
+    .card-body{padding:8px 12px}
+    .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid #e5e7eb;background:#f9fafb}
+    .k{color:#475569}
+    .v{font-weight:600}
+    .muted{color:#64748b}
+    .btn{padding:6px 10px;border-radius:10px;border:1px solid #e5e7eb;background:#f8fafc}
+    .btn:hover{background:#eef2f7}
+    .t{font-size:12px}
+    .tbl{width:100%;border-collapse:collapse}
+    .tbl th,.tbl td{border-bottom:1px solid #eef2f7}
+    .tbl td{font-size:12px}
+    .row-h{height:28px}
+    html,body{height:100%}
+    body{display:flex;flex-direction:column}
+    main{flex:1 1 auto}
+    footer{flex:0 0 auto}
+    .vfill{display:block;height:100%}
+    .help{font-size:11px;color:#64748b}
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
-  <div class="max-w-[1600px] mx-auto p-4">
-    <header class="mb-4 flex items-center gap-2">
+<body class="bg-slate-50">
+  <main class="max-w-7xl mx-auto p-4">
+    <header class="flex items-center gap-2 mb-3">
       <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드로</a>
-      <a href="./teacher_risk_v2.html"  class="ml-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">  담임별 관리</a>
-
+      <a href="./teacher_risk_v2.html"  class="ml-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">담임별 관리</a>
       <h1 class="text-2xl font-bold">반별 리스크 그리드</h1>
       <span class="ml-auto text-xs text-slate-500">미수행자 많은 반 순 • 4열 • 상세 접힘</span>
     </header>
 
-    <div id="errbox" class="hidden err rounded-lg p-3 mb-3 text-sm"></div>
+    <div id="errbox" class="hidden err rounded-lg p-3 mb-3 text-sm whitespace-pre-wrap"></div>
 
-    <!-- 필터/옵션 박스 (간결 버전) -->
-    <section class="mb-4 bg-white rounded-xl shadow p-4">
+    <!-- 필터/옵션 박스 -->
+    <section class="mb-4 bg-white rounded-xl shadow p-4 space-y-3">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="flex flex-wrap items-end gap-4">
           <div><label class="block text-xs font-medium mb-1">시작일</label><input id="startDate" type="date" class="w-44 rounded-lg border-slate-300" /></div>
           <div><label class="block text-xs font-medium mb-1">종료일</label><input id="endDate" type="date" class="w-44 rounded-lg border-slate-300" /></div>
-          <div class="grow">
-            <div class="text-xs font-medium mb-1">빠른 선택</div>
-            <div class="flex flex-wrap gap-2">
-              <button class="chip" id="rngAll">전체</button><button class="chip" id="rngToday">오늘</button>
-              <button class="chip" id="rngWeekMon">이번주(월~일)</button><button class="chip" id="rngMonth">이번달</button>
-              <button class="chip" id="rngLastWeek">지난주</button><button class="chip" id="rngLastMonth">지난달</button>
-            </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-slate-500">기간:</span>
+            <span id="rangeBadge" class="badge">전체</span>
           </div>
         </div>
-        <div class="flex flex-wrap items-end gap-4">
-          <div><label class="block text-xs font-medium mb-1">임계값(수행률 % 미만)</label><input id="threshold" type="number" min="0" max="100" value="70" class="w-24 rounded-lg border-slate-300 text-right" /></div>
-          <div><label class="block text-xs font-medium mb-1">최소 기록 수(학생별)</label><input id="minCnt" type="number" min="1" value="3" class="w-20 rounded-lg border-slate-300 text-right"/></div>
-          <div><label class="block text-xs font-medium mb-1">선생님(작성자) 필터</label><select id="teacherSel" class="w-56 rounded-lg border-slate-300"><option value="__ALL__">전체</option></select></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="rngAll" class="chip">전체</button>
+          <button id="rngWeekMon" class="chip">이번주(월~일)</button>
+          <button id="rngWeekSun" class="chip">이번주(일~토)</button>
+          <button id="rngMonth" class="chip">이번달</button>
+          <button id="rng30" class="chip">최근 30일</button>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-          <div class="ml-auto text-right"><div class="text-xs text-slate-500 mb-1">선택된 기간</div><div id="rangeBadge" class="inline-block chip">전체</div></div>
+          <div>
+            <label class="block text-xs font-medium mb-1">미수행 임계치(명)</label>
+            <input id="threshold" type="number" class="w-24 rounded-lg border-slate-300" value="2" min="0" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1">표시 최소 학생수</label>
+            <input id="minCnt" type="number" class="w-24 rounded-lg border-slate-300" value="5" min="0" />
+          </div>
         </div>
+      </div>
+
+      <!-- CSV 경로 지정/저장 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="text-xs text-slate-500">담당 필터</label>
+        <select id="teacherSel" class="rounded-lg border-slate-300 text-sm">
+          <option value="">전체</option>
+        </select>
+
+        <span class="ml-3 text-xs text-slate-500">데이터 파일:</span>
+        <input id="fileInput" type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="text-sm" />
+
+        <label class="ml-2 text-xs"><input id="autoLoad" type="checkbox" class="mr-1 align-[-2px] border" />자동불러오기</label>
+        <button id="clearSaved" class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장삭제</button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-slate-500">CSV 경로</span>
+        <input id="csvUrl" type="text" placeholder="예) example01.csv 또는 /repo/docs/example01.csv"
+               class="min-w-[280px] w-96 max-w-full rounded-lg border-slate-300 text-sm px-2 py-1" />
+        <button id="btnLoadCsv" class="btn text-xs">경로로 불러오기</button>
+        <button id="btnResetCsv" class="btn text-xs">CSV 경로 초기화</button>
+        <span id="csvHint" class="help">기본은 현재 HTML과 같은 폴더의 <code>example01.csv</code> 입니다. GitHub Pages에서 HTML과 CSV를 같은 폴더에 두세요.</span>
       </div>
     </section>
 
-    <!-- 그리드 -->
-    <section id="grid" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"></section>
+    <section class="grid-4" id="grid"></section>
+  </main>
 
-    <!-- 데이터 업로드 / 로딩 -->
-    <div class="fixed bottom-4 right-4">
-      <div class="bg-white rounded-xl shadow-lg p-3 flex items-center gap-2">
-        <input type="file" accept=".xlsx,.csv" id="fileInput" class="block text-sm" />
-        <label class="inline-flex items-center gap-1 text-xs"><input id="autoLoad" type="checkbox" class="rounded border" />자동불러오기</label>
-        <button id="clearSaved" class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장삭제</button>
-      </div>
-    </div>
-  </div>
+  <footer class="max-w-7xl mx-auto p-4 text-xs text-slate-500 flex items-center">
+    <span>※ CSV 헤더 예시: 날짜, 작성자, 과목, 반코드, 학생명, 상태, 담당</span>
+    <span class="ml-auto">LangCon · class_grid_risk</span>
+  </footer>
 
 <script>
-// ===== 기본 =====
-const LS_KEYS={autoload:'lancon_autoload',data:'lancon_data_json',savedAt:'lancon_saved_at'}; let RAW=[];
+/* ===== 기본 ===== */
+const LS_KEYS = {
+  autoload:'lancon_autoload',
+  data:'lancon_data_json',
+  savedAt:'lancon_saved_at',
+  csvUrl:'lancon_csv_url'
+};
+let RAW = [];
+
 const $=id=>document.getElementById(id);
-const els={startDate:$('startDate'),endDate:$('endDate'),rngAll:$('rngAll'),rngToday:$('rngToday'),rngWeekMon:$('rngWeekMon'),rngMonth:$('rngMonth'),rngLastWeek:$('rngLastWeek'),rngLastMonth:$('rngLastMonth'),rangeBadge:$('rangeBadge'),threshold:$('threshold'),minCnt:$('minCnt'),teacherSel:$('teacherSel'),grid:$('grid'),fileInput:$('fileInput'),autoLoad:$('autoLoad'),clearSaved:$('clearSaved'),errbox:$('errbox')};
-const showErr=m=>{els.errbox.textContent=m;els.errbox.classList.remove('hidden');console.error(m)}; const clearErr=()=>{els.errbox.classList.add('hidden');els.errbox.textContent=''};
+const els={
+  startDate:$("startDate"),endDate:$("endDate"),
+  rngAll:$("rngAll"),rngWeekMon:$("rngWeekMon"),rngWeekSun:$("rngWeekSun"),rngMonth:$("rngMonth"),rng30:$("rng30"),
+  rangeBadge:$("rangeBadge"),
+  threshold:$("threshold"),minCnt:$("minCnt"),
+  teacherSel:$("teacherSel"),
+  fileInput:$("fileInput"),autoLoad:$("autoLoad"),clearSaved:$("clearSaved"),
+  csvUrl:$("csvUrl"),btnLoadCsv:$("btnLoadCsv"),btnResetCsv:$("btnResetCsv"),
+  errbox:$("errbox"),grid:$("grid")
+};
+const showErr=m=>{els.errbox.textContent=m;els.errbox.classList.remove('hidden')};
+const hideErr=()=>{els.errbox.classList.add('hidden');els.errbox.textContent=''};
 const fmtYMD=d=>{const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`};
-function parseDate(v){if(v==null||v==='')return null;if(typeof v==='number'){try{const d=XLSX.SSF.parse_date_code(v);return new Date(d.y,d.m-1,d.d)}catch{return null}}const s=String(v).trim().replace(/[.\/]/g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3]);const d=new Date(s);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+
+/* ===== 날짜 파서 강화 (엑셀 직렬, 2024.05.01 등) ===== */
+function parseDate(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number'){
+    try{
+      const dd = XLSX.SSF.parse_date_code(v);
+      return new Date(dd.y, dd.m-1, dd.d);
+    }catch{ return null; }
+  }
+  const s = String(v).trim().replace(/^\ufeff/, '').replace(/[.\/]/g,'-');
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 function inRangeDate(d,{s,e}){const noF=!s&&!e;if(noF)return true;if(!d)return false;if(s&&d<s)return false;if(e&&d>e)return false;return true}
-function normalizeStatus(v){const s=String(v||'').trim();if(/과제안함|미수행|결석/.test(s))return'미수행';if(/해당없음|자료없음|배정없음/.test(s))return'제외';if(/^\d+$/.test(s))return(+s)>=1?'수행':'미수행';if(/^\d+%$/.test(s))return parseInt(s,10)>=1?'수행':'미수행';return'기타'}
-function mapRecord(r){const c={};for(const k in r){const nk=String(k).replace(/\ufeff/g,'').trim();const v=r[k];c[nk]=(typeof v==='string')?v.trim():v}const o={'날짜':c['날짜']??c['date']??c['Date']??'','작성자':c['작성자']??c['선생님']??c['Teacher']??'','과목':c['과목']??c['제목']??c['유형']??c['subject']??'','반코드':c['반코드']??c['반명']??c['반']??c['class']??'','학생명':c['학생명']??c['학생']??c['이름']??c['student']??'','상태':c['상태']??c['구분']??c['점수']??c['점수/비고']??c['결과']??''};for(const k in o){if(typeof o[k]==='string')o[k]=o[k].trim()}return o}
+function normalizeStatus(v){
+  const s=String(v||'').trim();
+  if(/과제안함|미수행|x|X|미제출|미완성|결석/.test(s))return'미수행';
+  if(/수행|o|O|제출|완료/.test(s))return'수행';
+  if(/^\d+%$/.test(s))return parseInt(s,10)>=1?'수행':'미수행';
+  return'기타'
+}
+
+/* ===== 헤더 BOM 제거 포함한 매핑 ===== */
+function mapRecord(r){
+  const c={};for(const k in r){const nk=String(k).replace(/\ufeff/g,'').trim();c[nk]=r[k]}
+  const o={
+    날짜:parseDate(c['날짜']??c['date']??c['Date']??c['DATE']??c['일자']??c['일시']??null),
+    작성자:c['작성자']??c['writer']??c['담임']??c['teacher']??'',
+    과목:c['과목']??c['subject']??'',
+    반코드:c['반코드']??c['반']??c['class']??c['반명']??'',
+    학생명:c['학생명']??c['학생']??c['name']??c['학생이름']??'',
+    상태:normalizeStatus(c['상태']??c['숙제']??c['결과']??c['status']??''),
+    담당:c['담당']??c['담임']??c['teacher']??c['Teacher']??''
+  };
+  for(const k in o){if(typeof o[k]==='string')o[k]=o[k].trim()}
+  return o
+}
 const rate=(done,miss)=>Math.round((done/((done+miss)||1))*100);
 
-// ===== 저장/불러오기 =====
+/* ===== 저장/불러오기 ===== */
 function saveData(rows){localStorage.setItem(LS_KEYS.data,JSON.stringify(rows));localStorage.setItem(LS_KEYS.savedAt,new Date().toISOString())}
-function loadDataFromLocal(){const flag=localStorage.getItem(LS_KEYS.autoload)==='1';els.autoLoad.checked=flag;const json=localStorage.getItem(LS_KEYS.data);if(flag&&json){try{const rows=JSON.parse(json);if(Array.isArray(rows)&&rows.length){RAW=rows;return true}}catch(e){showErr('저장 데이터 읽기 오류: '+e.message)}}return false}
-function clearLocal(){localStorage.removeItem(LS_KEYS.data);localStorage.removeItem(LS_KEYS.savedAt)}
-async function parseFile(file){const isCSV=/\.csv$/i.test(file.name||'');try{if(isCSV){const text=await file.text();let json=readCSVText(text);if((!json||!json.length)&&text.charCodeAt(0)===0xFEFF)json=readCSVText(text.slice(1));return json||[]}else{const buf=await file.arrayBuffer();return readArray(buf)||[]}}catch(e){showErr('파일 파싱 실패: '+e.message);return[]}} 
-function readCSVText(text){try{const first=(text.split(/\r?\n/).find(l=>l.trim().length>0)||'');const cnt={comma:(first.match(/,/g)||[]).length,tab:(first.match(/\t/g)||[]).length,semi:(first.match(/;/g)||[]).length};let n=text;if(cnt.tab>cnt.comma&&cnt.tab>=cnt.semi)n=text.replace(/\t/g,',');else if(cnt.semi>cnt.comma&&cnt.semi>cnt.tab)n=text.replace(/;/g,',');n=n.replace(/\r\n/g,'\n');const wb=XLSX.read(n,{type:'string'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('CSV 파싱 실패: '+e.message);return null}}
-function readArray(buf){try{const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false})}catch(e){showErr('바이너리 읽기 실패: '+e.message);return null}}
-<script>
-// ...위쪽 코드들...
-
-/* ===== 서버 CSV 불러오기 (Netlify 배포용) ===== */
-async function loadFromServer(){
+function loadDataFromLocal(){
+  const flag=localStorage.getItem(LS_KEYS.autoload)==='1';
+  if(!flag) return false;
   try{
-    const res = await fetch('example01.csv', { cache: 'no-store' });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text = await res.text();
-    const json = readCSVText(text);         // class_grid_risk에 이미 있는 CSV 파서 재사용
+    const raw=localStorage.getItem(LS_KEYS.data);
+    if(!raw) return false;
+    const arr=JSON.parse(raw)||[];
+    if(!Array.isArray(arr)||!arr.length) return false;
+    RAW=arr.map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+    return RAW.length>0
+  }catch(e){showErr('저장 데이터 읽기 오류: '+e.message)}
+  return false
+}
+function clearLocal(){localStorage.removeItem(LS_KEYS.data);localStorage.removeItem(LS_KEYS.savedAt)}
+
+/* ===== 파일 입력 파서 (CSV/XLSX) ===== */
+async function parseFile(file){
+  const isCSV=/\.csv$/i.test(file.name);
+  try{
+    if(isCSV){const text=await file.text();return readCSVText(text)||[]}
+    else{const buf=await file.arrayBuffer();return readArray(buf)||[]}
+  }catch(e){showErr('파일 파싱 실패: '+e.message);return[]}
+}
+
+/* ===== 안정 CSV 파서 (문자열 → SheetJS) ===== */
+function readCSVText(text){
+  try{
+    // 헤더 및 본문 앞쪽 BOM 제거
+    let n = String(text).replace(/^\ufeff/, '');
+
+    // 첫 유효 라인으로 구분자 감지
+    const first = (n.split(/\r?\n/).find(l => l.trim().length > 0) || '');
+    const cnt = {
+      comma: (first.match(/,/g) || []).length,
+      tab:   (first.match(/\t/g) || []).length,
+      semi:  (first.match(/;/g) || []).length
+    };
+    // 탭/세미콜론 → 콤마 변환
+    if(cnt.tab  > cnt.comma && cnt.tab  >= cnt.semi) n = n.replace(/\t/g, ',');
+    else if(cnt.semi > cnt.comma && cnt.semi > cnt.tab) n = n.replace(/;/g, ',');
+
+    // 개행 정규화
+    n = n.replace(/\r\n/g, '\n');
+
+    // SheetJS 문자열 파싱
+    const wb = XLSX.read(n, { type: 'string' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+  }catch(e){
+    showErr('CSV 파싱 실패: ' + e.message);
+    return null;
+  }
+}
+
+/* ===== XLSX/바이너리 파서 ===== */
+function readArray(buf){
+  try{
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+    return rows
+  }catch(e){showErr('바이너리 읽기 실패: '+e.message);return null}
+}
+
+/* ===== 서버 CSV 불러오기 (GitHub Pages 친화) ===== */
+const DEFAULT_CSV='example01.csv';
+function getCsvUrlFromUI(){
+  const v=els.csvUrl.value.trim();
+  if(!v) return null;
+  try{ return new URL(v, document.baseURI).href }catch{return null}
+}
+function getCsvUrl(){
+  const qp=new URLSearchParams(location.search).get('csv');
+  if(qp){ try{return new URL(qp, document.baseURI).href}catch{} }
+  const saved=localStorage.getItem(LS_KEYS.csvUrl);
+  if(saved){ try{return new URL(saved, document.baseURI).href}catch{} }
+  return new URL(DEFAULT_CSV, document.baseURI).href; // HTML과 같은 폴더 기본
+}
+async function loadFromServer(){
+  const url = getCsvUrl();
+  try{
+    const bust = (url.includes('?')?'&':'?') + 't=' + Date.now(); // 캐시 무력화
+    const res = await fetch(url + bust, { cache: 'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
+    let text = await res.text();
+    const json = readCSVText(text);
     RAW = (json||[])
       .map(mapRecord)
       .filter(r => Object.values(r).some(v => String(v??'').trim()!==''));
+    if(!RAW.length){
+      showErr(`서버 CSV를 읽었지만 유효한 행이 없습니다.\n확인사항:\n• 헤더: 날짜/작성자/과목/반코드/학생명/상태(,담당)\n• 파일 인코딩: UTF-8(BOM 가능)\n• 경로: ${url}`);
+    }
     renderAll();
+    if(els.autoLoad.checked) saveData(RAW);
   }catch(e){
-    showErr('서버 데이터 로드 실패: ' + (e?.message||e));
-    console.error(e);
+    showErr(`서버 데이터 로드 실패: ${e?.message||e}\n\n확인사항:\n1) HTML과 CSV를 같은 폴더에 두었나요?\n2) 이 페이지를 GitHub Pages 주소로 열었나요? (blob/raw 아님)\n3) 대소문자/확장자 정확한가요?\n\n시도한 URL: ${getCsvUrl()}`);
+    console.error('fetch failed', url, e);
   }
 }
-</script>
 
-// ===== 범위/보조 =====
+/* ===== 범위/보조 ===== */
 const getRange=()=>{const sd=els.startDate.value,ed=els.endDate.value;const s=sd?new Date(sd+'T00:00:00'):null;const e=ed?new Date(ed+'T23:59:59.999'):null;return{s,e}};
 function updateBadge(){const sd=els.startDate.value,ed=els.endDate.value;els.rangeBadge.textContent=(!sd&&!ed)?'전체':`${sd||'..'} ~ ${ed||'..'}`}
 function setRange(s,e){els.startDate.value=s?fmtYMD(s):'';els.endDate.value=e?fmtYMD(e):'';updateBadge();renderAll()}
 function actChip(el){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el?.classList.add('active')}
-function bindRangeChips(){const today=new Date();els.rngAll.onclick=()=>{setRange(null,null);actChip(els.rngAll)};els.rngToday.onclick=()=>{setRange(today,today);actChip(els.rngToday)};els.rngWeekMon.onclick=()=>{const d=new Date();const day=(d.getDay()+6)%7;const s=new Date(d);s.setDate(d.getDate()-day);const e=new Date(s);e.setDate(s.getDate()+6);setRange(s,e);actChip(els.rngWeekMon)};els.rngMonth.onclick=()=>{const d=new Date();const s=new Date(d.getFullYear(),d.getMonth(),1);const e=new Date(d.getFullYear(),d.getMonth()+1,0);setRange(s,e);actChip(els.rngMonth)};els.rngLastWeek.onclick=()=>{const d=new Date();const day=(d.getDay()+6)%7;const e=new Date(d);e.setDate(d.getDate()-day-1);const s=new Date(e);s.setDate(e.getDate()-6);setRange(s,e);actChip(els.rngLastWeek)};els.rngLastMonth.onclick=()=>{const d=new Date();const s=new Date(d.getFullYear(),d.getMonth()-1,1);const e=new Date(d.getFullYear(),d.getMonth(),0);setRange(s,e);actChip(els.rngLastMonth)}}
-
-// ===== 집계 & 렌더 =====
-function aggregateByClass(){
-  const range=getRange(); const th=Math.max(0,Math.min(100,+els.threshold.value||70)); const minCnt=Math.max(1,+els.minCnt.value||1);
-  const tchFilter=els.teacherSel.value;
-
-  // 학생 단위 버킷
-  const studentBuckets={};
-  RAW.forEach(r=>{
-    const d=parseDate(r['날짜']); if(!inRangeDate(d,range)) return;
-    const tch=(r['작성자']||'').trim(); if(tchFilter!=='__ALL__'&&tch!==tchFilter) return;
-    const cls=(r['반코드']||'').trim(); const st=normalizeStatus(r['상태']); const key=[r['학생명']||'',cls].join('|');
-    studentBuckets[key]??={학생:r['학생명']||'',반:cls,수행:0,미수행:0,담당집:new Set()};
-    if(tch) studentBuckets[key].담당집.add(tch);
-    if(st==='수행') studentBuckets[key].수행++; else if(st==='미수행') studentBuckets[key].미수행++;
-  });
-
-  // 반 보드 생성
-  const classBoards={};
-  Object.values(studentBuckets).forEach(v=>{
-    const board=(classBoards[v.반]||={반:v.반||'(반 미지정)',riskCnt:0,totalCnt:0,students:[],classDone:0,classMiss:0});
-    const total=v.수행+v.미수행;
-    board.totalCnt++;
-    board.classDone+=v.수행; board.classMiss+=v.미수행;
-    const rr=rate(v.수행,v.미수행);
-    // 리스크 카운트는 임계/최소건수 기준
-    if(total>=minCnt && rr<th){ board.riskCnt++; }
-    // ★ 리스트에는 "모든 학생" 수록 (담당, 수행/미수행, 수행률)
-    board.students.push({
-      학생:v.학생, 수행:v.수행, 미수행:v.미수행,
-      수행률: rr, 담당: [...v.담당집].join(', '),
-      risky: (total>=minCnt && rr<th)
-    });
-  });
-
-  // 반별 수행률 및 학생 정렬(수행률 오름차순 → risky 우선 → 이름)
-  Object.values(classBoards).forEach(b=>{
-    b.classRate=rate(b.classDone,b.classMiss);
-    b.students.sort((a,b)=> ( (a.risky===b.risky) ? (a.수행률-b.수행률) : (a.risky? -1:1) ) || a.학생.localeCompare(b.학생,'ko'));
-  });
-
-  // 정렬: 리스크 많은 반 → 반이름
-  return Object.values(classBoards).sort((a,b)=> (b.riskCnt-a.riskCnt)||a.반.localeCompare(b.반,'ko'));
+function bindRangeChips(){
+  const today=new Date();
+  els.rngAll.onclick=()=>{setRange(null,null);actChip(els.rngAll)};
+  els.rng30.onclick=()=>{const e=new Date();const s=new Date();s.setDate(s.getDate()-29);setRange(s,e);actChip(els.rng30)};
+  els.rngMonth.onclick=()=>{const e=new Date(today.getFullYear(),today.getMonth()+1,0);const s=new Date(today.getFullYear(),today.getMonth(),1);setRange(s,e);actChip(els.rngMonth)};
+  els.rngWeekMon.onclick=()=>{const day=today.getDay();const diff=(day+6)%7;const s=new Date(today);s.setDate(today.getDate()-diff);const e=new Date(s);e.setDate(s.getDate()+6);setRange(s,e);actChip(els.rngWeekMon)};
+  els.rngWeekSun.onclick=()=>{const day=today.getDay();const s=new Date(today);s.setDate(today.getDate()-day);const e=new Date(s);e.setDate(s.getDate()+6);setRange(s,e);actChip(els.rngWeekSun)}
 }
 
-function renderAll(){
-  try{
-    clearErr();
-    // 교사 목록 동기화
-    const setT=new Set(RAW.map(r=>String(r['작성자']||'').trim()).filter(Boolean));
-    const teachers=[...setT].sort((a,b)=>a.localeCompare(b,'ko')); const curT=els.teacherSel.value;
-    els.teacherSel.innerHTML='<option value="__ALL__">전체</option>'+teachers.map(t=>`<option value="${t}">${t}</option>`).join('');
-    if([...els.teacherSel.options].some(o=>o.value===curT)) els.teacherSel.value=curT;
-
-    const boards=aggregateByClass(); els.grid.innerHTML='';
-    if(!boards.length){
-      els.grid.innerHTML = '<div class="col-span-full p-6 text-center text-sm text-slate-500 bg-white border rounded-xl">표시할 반이 없습니다. (기간/필터를 조정하거나 데이터를 불러오세요)</div>';
-      return;
-    }
-    boards.forEach(b=>{
-      const rateColor=b.classRate<50?'bg-red-500':(b.classRate<70?'bg-orange-500':'bg-emerald-500');
-      const card=document.createElement('details'); card.className='rounded-xl border bg-white'; card.open=false;
-      const sum=document.createElement('summary'); sum.className='summary hover:bg-slate-50 select-none';
-      sum.innerHTML=`
-        <div class="px-3 py-2 flex items-center gap-3">
-          <div class="font-semibold flex-1 truncate">${b.반}</div>
-          <div class="flex items-center gap-2 shrink-0"><span class="badge">리스크 ${b.riskCnt}</span><span class="badge">총 ${b.totalCnt}</span></div>
-        </div>
-        <div class="px-3 pb-2">
-          <div class="text-xs text-slate-500 mb-1">반 수행률 ${b.classRate}%</div>
-          <div class="bar"><span class="${rateColor}" style="width:${b.classRate}%;"></span></div>
-        </div>
-      `;
-      card.appendChild(sum);
-
-      const inner=document.createElement('div'); inner.className='px-3 pb-3 hidden';
-      const tbl=document.createElement('div'); tbl.className='border rounded mt-3';
-      tbl.innerHTML=`
-        <table class="min-w-full text-sm">
-          <thead class="sticky-th">
-            <tr>
-              <th class="text-left px-2 py-1">학생</th>
-              <th class="text-right px-2 py-1">수행률</th>
-              <th class="text-right px-2 py-1">미수행</th>
-              <th class="text-left px-2 py-1">담당</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>`;
-      const tbody=tbl.querySelector('tbody');
-      b.students.forEach(s=>{
-        const tr=document.createElement('tr');
-        const color=s.수행률<50?'text-red-600':(s.수행률<70?'text-orange-600':'text-slate-800');
-        const bold=s.risky?'font-semibold':'';
-        tr.innerHTML=`
-          <td class="px-2 py-1 ${bold}">${s.학생}</td>
-          <td class="px-2 py-1 text-right ${color} ${bold}">${s.수행률}%</td>
-          <td class="px-2 py-1 text-right ${bold}">${s.미수행}</td>
-          <td class="px-2 py-1 ${bold}">${s.담당}</td>`;
-        tbody.appendChild(tr);
-      });
-      inner.appendChild(tbl); card.appendChild(inner);
-      card.addEventListener('toggle',()=>{inner.classList.toggle('hidden',!card.open)});
-      els.grid.appendChild(card);
+/* ===== 계산/집계 ===== */
+function buildTeachers(rows){
+  const set=new Set(rows.map(r=>r.담당||r.작성자).filter(Boolean));
+  const opt=['<option value="">전체</option>'].concat([...set].sort().map(t=>`<option>${t}</option>`)).join('');
+  els.teacherSel.innerHTML=opt
+}
+function groupByClass(rows){const map=new Map();rows.forEach(r=>{const key=r.반코드||'(반미지정)';if(!map.has(key))map.set(key,[]);map.get(key).push(r)});return map}
+function summarizeByClass(rows){
+  const m=groupByClass(rows);const out=[];
+  for(const [반,arr] of m.entries()){
+    let 수행=0,미수행=0;const byStu=new Map();
+    let 담당=arr.find(a=>a.담당)?.담당||arr.find(a=>a.작성자)?.작성자||'';
+    arr.forEach(r=>{
+      const name=r.학생명||'(이름누락)';
+      if(!byStu.has(name))byStu.set(name,{name,수행:0,미수행:0});
+      const o=byStu.get(name);
+      if(r.상태==='수행')o.수행++;
+      else if(r.상태==='미수행')o.미수행++;
     });
-  }catch(e){
-    showErr('렌더링 오류: '+(e?.message||e));
-    console.error(e);
+    byStu.forEach(o=>{수행+=o.수행;미수행+=o.미수행});
+    out.push({반,수행,미수행,총건수:수행+미수행,수행률:rate(수행,미수행),담당,학생수:byStu.size})
   }
+  return out.sort((a,b)=>b.미수행-a.미수행||a.수행률-b.수행률)
 }
 
-// ===== 바인딩 =====
+/* ===== 렌더링 ===== */
+function renderAll(){
+  hideErr();
+  const rng=getRange();
+  const th=parseInt(els.threshold.value||'0',10);
+  const minCnt=parseInt(els.minCnt.value||'0',10);
+  const teacher=els.teacherSel.value||'';
+  const rows=(RAW||[]).filter(r=>inRangeDate(r.날짜,rng)).filter(r=>teacher?((r.담당||r.작성자)===teacher):true);
+  buildTeachers(rows);
+  const sums=summarizeByClass(rows).filter(s=>s.학생수>=minCnt);
+  const grid=els.grid; grid.innerHTML='';
+  if(!sums.length){grid.innerHTML='<div class="muted">표시할 반이 없습니다. (기간/담당/최소 학생수 조건을 확인하세요)</div>';return}
+  sums.forEach(s=>{
+    const warn=s.미수행>=th;
+    const card=document.createElement('details');
+    card.className='card'; card.open=false;
+    const head=document.createElement('summary');
+    head.className='card-h summary';
+    head.innerHTML=`
+      <span class="text-sm font-semibold">${s.반}</span>
+      <span class="pill ${warn?'bg-red-50 border-red-200 text-red-700':''}">미수행 ${s.미수행}명</span>
+      <span class="pill">학생 ${s.학생수}명</span>
+      <span class="pill">수행률 ${s.수행률}%</span>
+      <span class="ml-auto text-xs muted">담당: ${s.담당||'-'}</span>`;
+    card.appendChild(head);
+
+    const inner=document.createElement('div');
+    inner.className='card-body hidden';
+    const tbl=document.createElement('table'); tbl.className='tbl';
+    tbl.innerHTML=`<thead class="sticky-th"><tr>
+        <th class="px-2 py-1 text-left">항목</th>
+        <th class="px-2 py-1 text-right">값</th>
+        <th class="px-2 py-1 text-right">비고</th>
+        <th class="px-2 py-1 text-right">담당</th>
+      </tr></thead><tbody></tbody>`;
+    const tbody=tbl.querySelector('tbody');
+    const bold = s.미수행>=th? 'font-semibold text-red-700' : '';
+    const color = s.미수행>=th? 'text-red-700' : 'text-slate-700';
+    [
+      {k:'총 건수',v:s.총건수,b:''},
+      {k:'수행',v:s.수행,b:''},
+      {k:'미수행',v:s.미수행,b:s.미수행>=th?`⚠ 임계치 ${th}+`:'-'},
+      {k:'학생 수',v:s.학생수,b:''},
+      {k:'수행률',v:`${s.수행률}%`,b:s.수행률<60?'낮음':''},
+    ].forEach(rw=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td class="px-2 py-1">${rw.k}</td>
+        <td class="px-2 py-1 text-right ${color} ${bold}">${rw.v}</td>
+        <td class="px-2 py-1 text-right ${bold}">${rw.b||''}</td>
+        <td class="px-2 py-1 ${bold}">${s.담당}</td>`;
+      tbody.appendChild(tr);
+    });
+    inner.appendChild(tbl); card.appendChild(inner);
+    card.addEventListener('toggle',()=>{inner.classList.toggle('hidden',!card.open)});
+    els.grid.appendChild(card);
+  });
+}
+
+/* ===== 바인딩 ===== */
 function bindApp(){
   els.startDate.addEventListener('change',()=>{updateBadge();renderAll()});
   els.endDate.addEventListener('change',()=>{updateBadge();renderAll()});
   bindRangeChips(); updateBadge();
+
   ['threshold','minCnt','teacherSel'].forEach(id=>els[id].addEventListener('change',renderAll));
   els.autoLoad.addEventListener('change',()=>{localStorage.setItem(LS_KEYS.autoload,els.autoLoad.checked?'1':'0')});
   els.clearSaved.addEventListener('click',()=>{clearLocal();alert('저장된 데이터(메인)를 삭제했습니다.')});
+
   els.fileInput.addEventListener('change',async e=>{
     try{
       const f=e.target.files[0]; if(!f) return;
       const parsed=await parseFile(f);
       RAW=(parsed||[]).map(mapRecord).filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
       if(!RAW.length){ showErr('파일을 읽었지만 유효한 행이 없습니다. (헤더: 날짜/작성자/과목/반코드/학생명/상태)'); }
-      renderAll(); if(els.autoLoad.checked) saveData(RAW);
+      renderAll();
+      if(els.autoLoad.checked) saveData(RAW);
     }catch(err){ showErr('파일 처리 오류: '+(err?.message||err)); console.error(err); }
   });
-+  // 자동불러오기 또는 서버 CSV 로드
-+  if(!loadDataFromLocal()){ 
-+    loadFromServer(); 
-+  } else { 
-+    renderAll(); 
+
+  // CSV 경로 지정 버튼
+  els.btnLoadCsv.addEventListener('click', ()=>{
+    const abs=getCsvUrlFromUI();
+    if(!abs){ alert('CSV 경로를 입력하세요. 예: example01.csv'); return; }
+    localStorage.setItem(LS_KEYS.csvUrl, els.csvUrl.value.trim());
+    loadFromServer();
+  });
+  els.btnResetCsv.addEventListener('click', ()=>{
+    localStorage.removeItem(LS_KEYS.csvUrl);
+    els.csvUrl.value='';
+    alert('CSV 경로 저장을 초기화했습니다. 기본(example01.csv)으로 다시 시도합니다.');
+    loadFromServer();
+  });
+
+  // 초기 CSV 경로 힌트 표시
+  const saved=localStorage.getItem(LS_KEYS.csvUrl);
+  if(saved) els.csvUrl.value=saved;
+
+  // 자동불러오기 또는 서버 CSV 로드 시도
+  if(!loadDataFromLocal()){
+    loadFromServer();
+  }else{
+    renderAll();
+  }
 }
 document.addEventListener('DOMContentLoaded',bindApp);
 </script>
