@@ -3,26 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>미수행자 분석 · 조치 기록 서브페이지</title>
+  <title>미수행자 조치 기록 보드</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .chip{border:1px solid #e2e8f0;border-radius:9999px;padding:6px 10px;font-size:12px;background:#f8fafc}
     .chip.active{background:#111827;color:#fff;border-color:#111827}
-    .seg{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;display:inline-flex}
-    .seg button{padding:6px 10px;font-size:12px}
-    .seg button.active{background:#111827;color:#fff}
     .sticky-th th{position:sticky;top:0;background:#f8fafc}
-    .clickable{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <div class="max-w-7xl mx-auto p-4">
     <header class="mb-4 flex items-center gap-2">
-      <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드로</a>
-      <h1 class="text-2xl font-bold">미수행자 분석 · 조치 기록</h1>
-      <span class="ml-auto text-xs text-slate-500">서브페이지: 기존 파일(메인) 수정 없음</span>
+      <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드</a>
+      <h1 class="text-2xl font-bold">미수행자 조치 기록 보드</h1>
+      <span class="ml-auto text-xs text-slate-500">단일 파일 · LocalStorage 저장</span>
     </header>
+    <div id="status" class="mb-3 text-sm text-slate-600"></div>
 
     <!-- 필터 박스 -->
     <section class="mb-4 bg-white rounded-xl shadow p-4">
@@ -53,85 +50,37 @@
       </div>
     </section>
 
-    <!-- 탭 -->
-    <nav class="mb-3 seg">
-      <button data-tab="tab1" class="active">① 학생별 수행률<70% 추출</button>
-      <button data-tab="tab2">② 미수행 인스턴스 · 조치 기록</button>
-      <button data-tab="tab3">③ 학생별 히스토리/프로파일</button>
-    </nav>
-
-    <section id="tab1" class="tab">
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-3 flex items-center gap-3">
-          <label class="text-sm flex items-center gap-2">임계값(%)
-            <input id="threshold" type="number" min="0" max="100" value="70" class="w-20 rounded-lg border-slate-300 text-right"/>
-          </label>
-          <input id="search1" placeholder="학생/반/선생님/과목 검색" class="rounded-lg border px-2 py-1 text-sm w-72"/>
-          <span class="text-sm text-slate-500" id="count1"></span>
-        </div>
-        <div class="overflow-auto max-h-[65vh]">
-          <table class="min-w-full text-sm">
-            <thead class="sticky-th">
-              <tr>
-                <th class="text-left px-2 py-2">학생</th>
-                <th class="text-left px-2 py-2">반</th>
-                <th class="text-left px-2 py-2">선생님</th>
-                <th class="text-left px-2 py-2">과목</th>
-                <th class="text-right px-2 py-2">수행</th>
-                <th class="text-right px-2 py-2">미수행</th>
-                <th class="text-right px-2 py-2">수행률</th>
-                <th class="text-left px-2 py-2">빠른 조치</th>
-              </tr>
-            </thead>
-            <tbody id="tbody1"></tbody>
-          </table>
-        </div>
+    <section class="mb-3 bg-white rounded-xl shadow p-4">
+      <div class="flex items-center gap-2 flex-wrap">
+        <input id="search" placeholder="학생/반/선생님/과목 검색" class="rounded-lg border px-2 py-1 text-sm w-80"/>
+        <select id="homeroom" class="rounded-lg border px-2 py-1 text-sm w-52"><option value="">담임: 전체</option></select>
+        <button id="btnExport" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700">조치기록 CSV 내보내기</button>
+        <span class="ml-auto text-sm text-slate-500" id="count"></span>
+      </div>
+      <div class="mt-3 overflow-auto max-h-[65vh]">
+        <table class="min-w-full text-sm">
+          <thead class="sticky-th">
+            <tr>
+              <th class="text-left px-2 py-2">날짜</th>
+              <th class="text-left px-2 py-2">학생</th>
+              <th class="text-left px-2 py-2">반</th>
+              <th class="text-left px-2 py-2">과목</th>
+              <th class="text-left px-2 py-2">선생님</th>
+              <th class="text-left px-2 py-2">상태</th>
+              <th class="text-left px-2 py-2">조치</th>
+              <th class="text-left px-2 py-2">조치일</th>
+              <th class="text-left px-2 py-2">해결</th>
+              <th class="text-left px-2 py-2">기록</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
       </div>
     </section>
 
-    <section id="tab2" class="tab hidden">
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-3 flex items-center gap-2 flex-wrap">
-          <input id="search2" placeholder="학생/반/선생님/과목/메모 검색" class="rounded-lg border px-2 py-1 text-sm w-72"/>
-          <button id="btnExport" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700">조치기록 CSV 내보내기</button>
-          <label class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm cursor-pointer">
-            CSV 가져오기
-            <input id="imp" type="file" accept=".csv" class="hidden" />
-          </label>
-          <span class="text-sm text-slate-500 ml-auto" id="count2"></span>
-        </div>
-        <div class="overflow-auto max-h-[65vh]">
-          <table class="min-w-full text-sm">
-            <thead class="sticky-th">
-              <tr>
-                <th class="text-left px-2 py-2">날짜</th>
-                <th class="text-left px-2 py-2">학생</th>
-                <th class="text-left px-2 py-2">반</th>
-                <th class="text-left px-2 py-2">과목</th>
-                <th class="text-left px-2 py-2">선생님</th>
-                <th class="text-left px-2 py-2">상태</th>
-                <th class="text-left px-2 py-2">조치</th>
-                <th class="text-left px-2 py-2">조치일</th>
-                <th class="text-left px-2 py-2">담당</th>
-                <th class="text-left px-2 py-2">메모</th>
-                <th class="text-left px-2 py-2">해결</th>
-                <th class="text-left px-2 py-2">기록</th>
-              </tr>
-            </thead>
-            <tbody id="tbody2"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="tab3" class="tab hidden">
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-3 flex items-center gap-3">
-          <input id="search3" placeholder="학생 이름 검색" class="rounded-lg border px-2 py-1 text-sm w-72"/>
-          <span class="text-sm text-slate-500" id="count3"></span>
-        </div>
-        <div id="profiles" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-      </div>
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="font-semibold mb-3">학생별 요약</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="summary"></div>
     </section>
 
     <!-- 데이터 업로드 / 로딩 -->
@@ -148,24 +97,22 @@
   </div>
 
 <script>
-// ===== 설정 (메인과 동일 키 사용) =====
+// ===== 설정 =====
 const LS_KEYS = {
   autoload: 'lancon_autoload',
-  data: 'lancon_data_json', // 메인과 공유
+  data: 'lancon_data_json',       // 메인과 공유
   savedAt: 'lancon_saved_at',
-  actions: 'lancon_interventions_v1' // 이 페이지 전용: 조치 기록
+  actions: 'lancon_interventions_v2' // 이 페이지 전용: 조치 기록
 };
 
-let RAW = [];             // 메인 데이터
-let ACTIONS = [];         // 조치 기록
+let RAW = [];      // 메인 데이터
+let ACTIONS = [];  // 조치 기록
 
-// ===== 공통 유틸 =====
+// ===== 유틸 =====
 function fmtYMD(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`}
 function parseDate(val){
   if(val==null) return null;
-  if(typeof val==='number'){
-    try{const d=XLSX.SSF.parse_date_code(val);return new Date(d.y,d.m-1,d.d);}catch{return null;}
-  }
+  if(typeof val==='number'){ try{const d=XLSX.SSF.parse_date_code(val);return new Date(d.y,d.m-1,d.d);}catch{return null;} }
   const s=String(val).trim().replace(/[.\/]/g,'-');
   const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if(m){return new Date(+m[1],+m[2]-1,+m[3]);}
@@ -193,7 +140,7 @@ function mapRecord(r){
   return obj;
 }
 
-// ===== 로컬 저장소 =====
+// ===== LocalStorage =====
 function saveActions(){ localStorage.setItem(LS_KEYS.actions, JSON.stringify(ACTIONS)); }
 function loadActions(){ try{ const s=localStorage.getItem(LS_KEYS.actions); ACTIONS = s? JSON.parse(s): []; }catch{ ACTIONS=[]; } }
 function saveData(rows){ localStorage.setItem(LS_KEYS.data, JSON.stringify(rows)); localStorage.setItem(LS_KEYS.savedAt, new Date().toISOString()); }
@@ -206,7 +153,7 @@ function loadDataFromLocal(){
 }
 function clearLocal(){ localStorage.removeItem(LS_KEYS.data); localStorage.removeItem(LS_KEYS.savedAt); localStorage.removeItem(LS_KEYS.actions); }
 
-// ===== CSV/XLSX 파싱 =====
+// ===== 파일 파싱/로드 =====
 async function parseFile(file){
   const isCSV=/\.csv$/i.test(file.name||'');
   try{
@@ -222,14 +169,14 @@ function readCSVText(text){
   try{
     const lines=text.split(/\r?\n/); const first=lines.find(l=>l.trim().length>0)||'';
     const cnt={comma:(first.match(/,/g)||[]).length, tab:(first.match(/\t/g)||[]).length, semi:(first.match(/;/g)||[]).length};
-    let normalized=text; if(cnt.tab>cnt.comma && cnt.tab>=cnt.semi) normalized=text.replace(/\t/g, ','); else if(cnt.semi>cnt.comma && cnt.semi>cnt.tab) normalized=text.replace(/;/g, ',');
+    let normalized=text; if(cnt.tab>cnt.comma && cnt.tab>=cnt.semi) normalized=text.replace(/\t/g, ','); else if(cnt.semi>cnt.comma && cnt.semi>cnt.tab) normalized=text.replace(/;/g, ','); 
     const wb=XLSX.read(normalized,{type:'string'}); const ws=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
   }catch{return null;}
 }
 function readArray(buf,codepage){ try{ const opts={type:'array'}; if(codepage) opts.codepage=codepage; const wb=XLSX.read(buf,opts); const ws=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false}); }catch{return null;}}
 async function loadFromServer() {
   try {
-    const res = await fetch('example01.csv');   // index.html과 같은 폴더라면
+    const res = await fetch('example01.csv');   // 같은 폴더에 있을 때
     const text = await res.text();
     const wb = XLSX.read(text, { type: 'string' });
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -243,8 +190,8 @@ async function loadFromServer() {
   }
 }
 
-// ===== 범위 & 필터 =====
-function getRange(){ const sd=document.getElementById('startDate').value; const ed=document.getElementById('endDate').value; const s=sd? new Date(sd+'T00:00:00'):null; const e=ed? new Date(ed+'T23:59:59.999'):null; return {s,e}; }
+// ===== 범위/필터 =====
+function getRange(){ const sd=startDate.value, ed=endDate.value; const s=sd? new Date(sd+'T00:00:00'):null; const e=ed? new Date(ed+'T23:59:59.999'):null; return {s,e}; }
 function inRange(d,{s,e}){ if(!d) return false; if(s&&d<s) return false; if(e&&d>e) return false; return true; }
 function updateBadge(){ const sd=startDate.value, ed=endDate.value; const b=document.getElementById('rangeBadge'); b.textContent= (!sd&&!ed)? '전체' : `${sd||'..'} ~ ${ed||'..'}`; }
 function setRange(s,e){ startDate.value=s?fmtYMD(s):''; endDate.value=e?fmtYMD(e):''; updateBadge(); renderAll(); }
@@ -259,8 +206,7 @@ function bindRangeChips(){
 }
 function actChip(el){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el?.classList.add('active'); }
 
-// ===== 조치 기록 모델 =====
-// key: `${when}|${student}|${classCode}|${subject}` 로 특정 미수행 인스턴스에 매핑
+// ===== 키 & 조치 모델 =====
 function makeKey(r){ const d=parseDate(r['날짜']); return [d?fmtYMD(d):'', r['학생명']||'', r['반코드']||'', r['과목']||''].join('|'); }
 function getActionByKey(key){ return ACTIONS.find(a=>a.key===key); }
 function upsertAction(rec){
@@ -269,78 +215,23 @@ function upsertAction(rec){
   saveActions();
 }
 
-// ===== 렌더 1: 학생별 레이트 하위 (탭1) =====
-function rate(done,miss){ return Math.round((done/((done+miss)||1))*100); }
-function renderTab1(){
-  const range=getRange();
-  const bucket={}; // student|class|teacher|subject -> counts
-  RAW.forEach(r=>{
-    const d=parseDate(r['날짜']); if(!inRange(d,range)) return;
-    const st=normalizeStatus(r['상태']);
-    const key=[r['학생명'], r['반코드'], r['작성자'], r['과목']].map(v=>String(v||'')).join('|');
-    bucket[key] ??= {학생:r['학생명']||'', 반:r['반코드']||'', 선생님:r['작성자']||'', 과목:r['과목']||'', 수행:0, 미수행:0};
-    if(st==='수행') bucket[key].수행++; else if(st==='미수행') bucket[key].미수행++; // 제외/기타는 레이트에서 제외
-  });
-  const th = Math.max(0, Math.min(100, +document.getElementById('threshold').value||70));
-  let rows = Object.values(bucket).map(v=> ({...v, 수행률: rate(v.수행, v.미수행)})).filter(v=> v.수행+v.미수행>0 && v.수행률 < th);
-
-  // 검색 필터
-  const q=(document.getElementById('search1').value||'').trim().toLowerCase();
-  if(q) rows = rows.filter(r=> Object.values(r).join(' ').toLowerCase().includes(q));
-
-  // 정렬: 수행률 오름차순 -> 미수행 desc -> 학생명
-  rows.sort((a,b)=> a.수행률-b.수행률 || b.미수행-a.미수행 || a.학생.localeCompare(b.학생));
-
-  const tbody=document.getElementById('tbody1'); tbody.innerHTML='';
-  rows.forEach(v=>{
-    const tr=document.createElement('tr'); tr.className='hover:bg-slate-50';
-    tr.innerHTML=`
-      <td class="px-2 py-1">${v.학생}</td>
-      <td class="px-2 py-1">${v.반}</td>
-      <td class="px-2 py-1">${v.선생님}</td>
-      <td class="px-2 py-1">${v.과목}</td>
-      <td class="px-2 py-1 text-right">${v.수행}</td>
-      <td class="px-2 py-1 text-right">${v.미수행}</td>
-      <td class="px-2 py-1 text-right">${v.수행률}%</td>
-      <td class="px-2 py-1">
-        <button class="px-2 py-1 rounded bg-indigo-600 text-white text-xs hover:bg-indigo-700">미수행 조치</button>
-      </td>
-    `;
-    tr.querySelector('button').onclick = ()=> openActionQuick(v.학생, v.반, v.선생님, v.과목);
-    tbody.appendChild(tr);
-  });
-  document.getElementById('count1').textContent = `${rows.length}명`;
-}
-
-function openActionQuick(student, cls, teacher, subject){
-  // 탭2로 이동하고, 해당 학생/반/과목으로 필터
-  document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('active'));
-  document.querySelector('.seg button[data-tab="tab2"]').classList.add('active');
-  document.querySelectorAll('.tab').forEach(s=>s.classList.add('hidden'));
-  document.getElementById('tab2').classList.remove('hidden');
-  const q=[student, cls, teacher, subject].filter(Boolean).join(' ');
-  document.getElementById('search2').value=q;
-  renderTab2();
-}
-
-// ===== 렌더 2: 미수행 인스턴스 + 조치 기록 (탭2) =====
-function renderTab2(){
+// ===== 렌더: 본표 =====
+function renderTable(){
   const range=getRange();
   let rows = RAW.filter(r=> normalizeStatus(r['상태'])==='미수행' && inRange(parseDate(r['날짜']), range));
-  // 검색
-  const q=(document.getElementById('search2').value||'').trim().toLowerCase();
-  if(q) rows = rows.filter(r=> `${r['학생명']} ${r['반코드']} ${r['작성자']} ${r['과목']}`.toLowerCase().includes(q) || (getActionByKey(makeKey(r))?.memo||'').toLowerCase().includes(q));
-  // 최신 날짜 우선 -> 학생명
+  const q=(search.value||'').trim().toLowerCase();
+  if(q) rows = rows.filter(r=> `${r['학생명']} ${r['반코드']} ${r['작성자']} ${r['과목']}`.toLowerCase().includes(q) );
+  const hrSel = document.getElementById('homeroom');
+  const hr = hrSel ? (hrSel.value||'') : '';
+  if(hr) rows = rows.filter(r=> String((r['담임']&&String(r['담임']).trim())? r['담임'] : (r['작성자']||'')) === hr);
   rows.sort((a,b)=> (parseDate(b['날짜'])-parseDate(a['날짜'])) || String(a['학생명']||'').localeCompare(String(b['학생명']||'')) );
-
-  const tbody=document.getElementById('tbody2'); tbody.innerHTML='';
+  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
   rows.forEach(r=>{
     const key = makeKey(r);
-    const act = getActionByKey(key) || { key, action:'', actionDate:'', owner:'', memo:'', resolved:false };
-    const d=parseDate(r['날짜']);
+    const act = getActionByKey(key) || { key, action:'', actionDate:'', resolved:false };
     const tr=document.createElement('tr'); tr.className='hover:bg-slate-50';
     tr.innerHTML = `
-      <td class="px-2 py-1">${d?fmtYMD(d):''}</td>
+      <td class="px-2 py-1">${fmtYMD(parseDate(r['날짜']))}</td>
       <td class="px-2 py-1">${r['학생명']||''}</td>
       <td class="px-2 py-1">${r['반코드']||'(미지정)'}</td>
       <td class="px-2 py-1">${r['과목']||'(미지정)'}</td>
@@ -348,65 +239,81 @@ function renderTab2(){
       <td class="px-2 py-1">${r['상태']||''}</td>
       <td class="px-2 py-1">${renderActionSelect(act.action)}</td>
       <td class="px-2 py-1"><input type="date" class="rounded border text-sm" value="${act.actionDate||''}"/></td>
-      <td class="px-2 py-1"><input type="text" class="rounded border text-sm w-28" placeholder="담당" value="${act.owner||''}"/></td>
-      <td class="px-2 py-1"><input type="text" class="rounded border text-sm w-64" placeholder="메모" value="${act.memo||''}"/></td>
-      <td class="px-2 py-1 text-center"><input type="checkbox" ${act.resolved?'checked':''}/></td>
+      <td class="px-2 py-1 text-center"><input type="checkbox"/></td>
       <td class="px-2 py-1"><button class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장</button></td>
+
     `;
-    const [sel, dt, own, memo, chk, btn] = [
-      tr.querySelector('select'), tr.querySelector('input[type="date"]'), tr.querySelector('input[type="text"]'), tr.querySelectorAll('input[type="text"]')[1], tr.querySelector('input[type="checkbox"]'), tr.querySelector('button')
+    const [sel, dt, chk, btn] = [
+      tr.querySelector('select'), tr.querySelector('input[type="date"]'),
+      tr.querySelector('input[type="checkbox"]'), tr.querySelector('button')
     ];
     btn.onclick = ()=>{
-      const rec={ key, action: sel.value, actionDate: dt.value, owner: own.value, memo: memo.value, resolved: chk.checked };
-      upsertAction(rec);
-      btn.textContent='저장됨';
-      setTimeout(()=> btn.textContent='저장', 1200);
+      const rec={ key, action: sel.value, actionDate: dt.value, resolved: chk.checked };
+      upsertAction(rec); btn.textContent='저장됨'; setTimeout(()=> btn.textContent='저장', 1200);
+      renderSummary(); // 요약 갱신
     };
     tbody.appendChild(tr);
   });
-  document.getElementById('count2').textContent = `${rows.length}건`;
+  count.textContent = `${rows.length}건`;
+  try{ const hrS = document.getElementById('homeroom'); const hr = hrS ? (hrS.value||'') : ''; if(hr){ count.textContent += ` · 담임: ${hr}`; } }catch{}
 }
-
 function renderActionSelect(value){
   const options=['','Detention','다음 시간까지 수행','학부모 연락','보충수업/클리닉','과제 재배정','기타'];
   return `<select class="rounded border text-sm">${options.map(o=>`<option value="${o}" ${o===value?'selected':''}>${o||'- 조치 선택 -'}</option>`).join('')}</select>`;
 }
 
-// ===== 렌더 3: 학생별 프로파일 (탭3) =====
-function renderTab3(){
+// ===== 렌더: 학생별 요약 =====
+function rate(done,miss){ return Math.round((done/((done+miss)||1))*100); }
+function renderSummary(){
+  // hide the summary section if homeroom selected
+  try{
+    const hrSel = document.getElementById('homeroom');
+    const selectedHR = hrSel ? (hrSel.value||'') : '';
+    const wrap=document.getElementById('summary');
+    const section = wrap?.closest('section');
+    if(selectedHR){ if(section) section.style.display='none'; wrap.innerHTML=''; return; }
+    if(section) section.style.display='block';
+  }catch{}
+
+  // === NEW: show only when searching student name ===
+  try{
+    const searchEl = document.getElementById('search');
+    const q = (searchEl?.value || '').trim().toLowerCase();
+    const wrap2 = document.getElementById('summary');
+    const section2 = wrap2?.closest('section');
+    if(!q){ if(section2) section2.style.display='none'; wrap2.innerHTML=''; return; }
+  }catch{}
+
   const range=getRange();
-  const names=[...new Set(RAW.map(r=>r['학생명']).filter(Boolean))].sort();
-  const q=(document.getElementById('search3').value||'').trim().toLowerCase();
-  const list=q? names.filter(n=> n.toLowerCase().includes(q)) : names;
-  const wrap=document.getElementById('profiles'); wrap.innerHTML='';
-  list.forEach(name=>{
+  const wrap=document.getElementById('summary'); wrap.innerHTML='';
+  const allNames=[...new Set(RAW.map(r=>r['학생명']).filter(Boolean))].sort();
+  const q=(document.getElementById('search')?.value||'').trim().toLowerCase();
+  const names=allNames.filter(n=> String(n).toLowerCase().includes(q));
+  names.forEach(name=>{
     const mine=RAW.filter(r=> r['학생명']===name && inRange(parseDate(r['날짜']), range));
     const done=mine.filter(r=> normalizeStatus(r['상태'])==='수행').length;
     const miss=mine.filter(r=> normalizeStatus(r['상태'])==='미수행').length;
+    if(done+miss===0) return;
     const r= rate(done,miss);
-    const actions=ACTIONS.filter(a=> a.key.includes(`|${name}|`));
+    const misses=mine.filter(rm=> normalizeStatus(rm['상태'])==='미수행')
+                     .sort((a,b)=> parseDate(b['날짜'])-parseDate(a['날짜'])).slice(0,10);
     const card=document.createElement('div'); card.className='p-4 bg-white rounded-xl shadow';
     card.innerHTML=`
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between mb-2">
         <div>
           <h3 class="font-semibold text-lg">${name}</h3>
           <div class="text-sm text-slate-600">수행 ${done} · 미수행 ${miss} · 수행률 ${r}%</div>
         </div>
         <button class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">미수행만 보기</button>
       </div>
-      <div class="mt-3 text-sm">
-        <div class="font-medium mb-1">최근 미수행</div>
-        <div class="max-h-40 overflow-auto border rounded">
-          <table class="min-w-full text-sm">
-            <thead class="sticky-th"><tr><th class="text-left px-2 py-1">날짜</th><th class="text-left px-2 py-1">반</th><th class="text-left px-2 py-1">과목</th><th class="text-left px-2 py-1">선생님</th><th class="text-left px-2 py-1">조치</th><th class="text-left px-2 py-1">해결</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
+      <div class="text-sm max-h-40 overflow-auto border rounded">
+        <table class="min-w-full text-sm">
+          <thead class="sticky-th"><tr><th class="text-left px-2 py-1">날짜</th><th class="text-left px-2 py-1">반</th><th class="text-left px-2 py-1">과목</th><th class="text-left px-2 py-1">선생님</th><th class="text-left px-2 py-1">조치</th><th class="text-left px-2 py-1">해결</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     `;
     const tbody=card.querySelector('tbody');
-    const misses=RAW.filter(r=> r['학생명']===name && normalizeStatus(r['상태'])==='미수행' && inRange(parseDate(r['날짜']), range))
-                    .sort((a,b)=> parseDate(b['날짜'])-parseDate(a['날짜'])).slice(0,20);
     misses.forEach(rm=>{
       const key=makeKey(rm); const act=getActionByKey(key);
       const tr=document.createElement('tr'); tr.innerHTML=`
@@ -419,52 +326,70 @@ function renderTab3(){
       `; tbody.appendChild(tr);
     });
     card.querySelector('button').onclick=()=>{
-      document.querySelector('.seg button[data-tab="tab2"]').click();
-      document.getElementById('search2').value=name; renderTab2();
+      document.getElementById('search').value=name; renderAll();
     };
     wrap.appendChild(card);
   });
-  document.getElementById('count3').textContent = `${list.length}명`;
 }
 
-// ===== 내보내기/가져오기 (조치기록) =====
+// ===== 내보내기/가져오기 =====
 function exportCSV(){
-  const header=['key','action','actionDate','owner','memo','resolved'];
-  const rows=ACTIONS.map(a=>({ ...a, resolved: a.resolved?1:0 }));
+  const header=['key','action','actionDate','resolved'];
+  const rows=ACTIONS.map(a=>({ key:a.key, action:a.action, actionDate:a.actionDate, resolved:a.resolved?1:0 }));
   const ws=XLSX.utils.json_to_sheet(rows,{header});
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'interventions');
   const out=XLSX.write(wb,{type:'array',bookType:'csv'});
   const blob=new Blob([out],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='interventions.csv'; a.click(); URL.revokeObjectURL(url);
 }
-async function importCSV(file){
-  const text=await file.text(); const wb=XLSX.read(text,{type:'string'}); const ws=wb.Sheets[wb.SheetNames[0]]; const json=XLSX.utils.sheet_to_json(ws,{defval:''});
-  const rows=json.map(r=>({key:r.key||'', action:r.action||'', actionDate:r.actionDate||'', owner:r.owner||'', memo:r.memo||'', resolved: String(r.resolved)==='1' || String(r.resolved).toLowerCase()==='true'})).filter(r=>r.key);
-  rows.forEach(upsertAction); renderAll();
-}
 
 // ===== 렌더 드라이버 =====
-function renderAll(){ renderTab1(); renderTab2(); renderTab3(); }
+function renderAll(){
+  try{
+    // homeroom select populate
+    const sel = document.getElementById('homeroom');
+    if(sel){
+      const uniq = Array.from(new Set((RAW||[]).map(r=> (r['담임']&&String(r['담임']).trim())? r['담임'] : (r['작성자']||'')).filter(v=> String(v||'').trim()!==''))).sort((a,b)=> String(a).localeCompare(String(b)));
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">담임: 전체</option>' + uniq.map(v=> `<option value="${v}">${v}</option>`).join('');
+      if(uniq.includes(cur)) sel.value = cur;
+    }
+  }catch{}
+ renderTable(); renderSummary(); }
 
 // ===== 초기 바인딩 =====
 function bindApp(){
-  // 탭
-  document.querySelectorAll('.seg button').forEach(btn=>{
-    btn.onclick=()=>{
-      document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelectorAll('.tab').forEach(s=>s.classList.add('hidden'));
-      document.getElementById(btn.dataset.tab).classList.remove('hidden');
-    };
-  });
+
+  // 보조 안전장치: 담임(선생님) 셀렉터가 없으면 즉석 생성
+  (function ensureHomeroomSelect(){
+    try{
+      if(!document.getElementById('homeroom')){
+        const searchEl = document.getElementById('search');
+        if(searchEl && searchEl.parentElement){
+          const sel = document.createElement('select');
+          sel.id = 'homeroom';
+          sel.className = 'rounded-lg border px-2 py-1 text-sm w-52';
+          sel.innerHTML = '<option value="">담임: 전체</option>';
+          searchEl.insertAdjacentElement('afterend', sel);
+          sel.onchange = ()=>{ renderAll(); try{ document.querySelector('table').scrollIntoView({behavior:'smooth', block:'start'}); }catch{} };
+          const st = document.getElementById('status');
+          if(st) st.textContent = (st.textContent? st.textContent+' · ' : '') + '담임 선택란을 생성했습니다.';
+        }
+      } else {
+        // 존재하는 경우에도 보이도록 강제
+        const sel = document.getElementById('homeroom');
+        sel.style.display = '';
+      }
+    }catch(e){ console.warn('ensureHomeroomSelect failed', e); }
+  })();
+
   // 범위
   startDate.onchange=()=>{ updateBadge(); renderAll(); };
   endDate.onchange=()=>{ updateBadge(); renderAll(); };
   bindRangeChips(); updateBadge();
-
-  // 검색/필터
-  search1.oninput=renderTab1; threshold.onchange=renderTab1; search2.oninput=renderTab2; search3.oninput=renderTab3;
-
+  // 검색 & 담임 필터
+  search.oninput=renderAll;
+  const hrSel = document.getElementById('homeroom'); if(hrSel){ hrSel.onchange=()=>{ renderAll(); try{ document.querySelector('table').scrollIntoView({behavior:'smooth', block:'start'}); }catch{} }; }
   // 우측 로더
   autoLoad.onchange=()=>{ localStorage.setItem(LS_KEYS.autoload, autoLoad.checked?'1':'0'); };
   clearSaved.onclick=()=>{ clearLocal(); alert('저장된 데이터(메인+조치기록)를 삭제했습니다.'); };
@@ -473,12 +398,11 @@ function bindApp(){
     RAW=(parsed||[]).map(mapRecord).filter(r=> Object.values(r).some(v=> String(v??'').trim()!==''));
     renderAll(); if(autoLoad.checked){ saveData(RAW); }
   };
-  btnExport.onclick=exportCSV; imp.onchange=(e)=>{ const f=e.target.files[0]; if(f) importCSV(f); };
+  btnExport.onclick=exportCSV; 
 
   // 데이터 불러오기
   loadActions();
   if (!loadDataFromLocal()) {
-    // LocalStorage가 비어 있으면 서버 CSV 시도
     loadFromServer();
   }
   renderAll();
