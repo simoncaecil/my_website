@@ -679,7 +679,7 @@ function bindApp(){
   bindMissModal();
 
 // 수정
-loadFromLocal() || loadFromServer();
+loadFromServer().catch(()=>{}).finally(()=>{ if(!RAW.length) loadFromLocal(); });
 
 
 }
