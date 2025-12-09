@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 <head>
 <meta charset="utf-8"/>
@@ -21,31 +20,38 @@
     .modal{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center}
     .modal.active{display:flex}
     .clickable{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-  </style>
+</style>
 </head>
+
 <body class="bg-slate-50 text-slate-800">
+
 <div class="flex min-h-screen">
 <aside class="w-64 bg-white shadow-lg p-4 flex flex-col">
 <h2 class="text-lg font-bold mb-2">선생님 목록</h2>
 <input class="mb-2 w-full rounded-lg border px-2 py-1 text-sm" id="teacherSearch" placeholder="검색" type="text"/>
 <button class="mb-3 w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700" id="btnHome">전체 대시보드</button>
-  <a href="miss_tracker.html" 
-     class="mb-3 w-full px-3 py-2 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-700 text-center">
-    미수행자 분석
-  </a>
+<a href="miss_tracker.html" 
+   class="mb-3 w-full px-3 py-2 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-700 text-center">
+  미수행자 분석
+</a>
 <ul class="space-y-1 text-sm flex-1 overflow-auto" id="teacherList"></ul>
 </aside>
+
 <main class="flex-1 p-6">
+
 <section class="mb-5 bg-white rounded-xl shadow p-4">
 <div class="flex flex-wrap items-end gap-4">
+
 <div>
 <label class="block text-xs font-medium mb-1">시작일</label>
 <input class="w-44 rounded-lg border-slate-300" id="startDate" type="date"/>
 </div>
+
 <div>
 <label class="block text-xs font-medium mb-1">종료일</label>
 <input class="w-44 rounded-lg border-slate-300" id="endDate" type="date"/>
 </div>
+
 <div class="grow">
 <div class="text-xs font-medium mb-1">빠른 선택</div>
 <div class="flex flex-wrap gap-2">
@@ -57,12 +63,15 @@
 <button class="chip" id="rngLastMonth">지난달</button>
 </div>
 </div>
+
 <div class="ml-auto text-right">
 <div class="text-xs text-slate-500 mb-1">선택된 기간</div>
 <div class="inline-block chip" id="rangeBadge">전체</div>
 </div>
+
 </div>
 </section>
+
 <section class="page active" id="page-overall">
 <header class="mb-6 flex items-center justify-between">
 <div>
@@ -74,19 +83,36 @@
 <option value="rate">수행률순</option>
 </select>
 </header>
-<div class="hidden p-6 rounded-xl bg-white shadow text-center text-slate-500" id="overallEmpty">데이터가 없습니다. <button class="ml-2 px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-sm" id="resetFilter">필터 초기화</button></div>
+<div class="hidden p-6 rounded-xl bg-white shadow text-center text-slate-500" id="overallEmpty">
+데이터가 없습니다. 
+<button class="ml-2 px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-sm" id="resetFilter">필터 초기화</button>
+</div>
+
 <div id="overallContent">
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-<div class="p-4 bg-white rounded-xl shadow"><div class="text-sm text-slate-500">총 건수</div><div class="text-2xl font-bold" id="kpiTotal">0</div></div>
-<div class="p-4 bg-white rounded-xl shadow"><div class="text-sm text-slate-500">수행</div><div class="text-2xl font-bold" id="kpiDone">0</div></div>
-<div class="p-4 bg-white rounded-xl shadow"><div class="text-sm text-slate-500">미수행</div><div class="text-2xl font-bold clickable" id="kpiMiss">0</div></div>
-<div class="p-4 bg-white rounded-xl shadow"><div class="text-sm text-slate-500">수행률</div><div class="text-2xl font-bold" id="kpiRate">0%</div></div>
+<div class="p-4 bg-white rounded-xl shadow">
+<div class="text-sm text-slate-500">총 건수</div>
+<div class="text-2xl font-bold" id="kpiTotal">0</div></div>
+
+<div class="p-4 bg-white rounded-xl shadow">
+<div class="text-sm text-slate-500">수행</div>
+<div class="text-2xl font-bold" id="kpiDone">0</div></div>
+
+<div class="p-4 bg-white rounded-xl shadow">
+<div class="text-sm text-slate-500">미수행</div>
+<div class="text-2xl font-bold clickable" id="kpiMiss">0</div></div>
+
+<div class="p-4 bg-white rounded-xl shadow">
+<div class="text-sm text-slate-500">수행률</div>
+<div class="text-2xl font-bold" id="kpiRate">0%</div></div>
 </div>
+
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 <div class="p-4 bg-white rounded-xl shadow">
 <h3 class="font-semibold mb-3">선생님별 수행률</h3>
 <canvas id="chartOverallClass"></canvas>
 </div>
+
 <div class="p-4 bg-white rounded-xl shadow">
 <h3 class="font-semibold mb-3">전체 상태 분포</h3>
 <canvas id="chartOverallStatus"></canvas>
@@ -94,49 +120,50 @@
 </div>
 </div>
 </section>
+
+
+<!-- ================================
+      선생님 상세 페이지
+================================ -->
 <section class="page" id="page-teacher">
 <header class="mb-6 flex items-center justify-between">
 <div>
 <h1 class="text-2xl font-bold" id="teacherName"></h1>
 <p class="text-sm text-slate-600">선택된 기간 기준, 반별 · 내용별 수행률</p>
 </div>
-<button class="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-sm" id="btnBack">전체로</button>
+<button class="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-sm" id="btnBack">
+전체로
+</button>
 </header>
-<div class="hidden p-6 rounded-xl bg-white shadow text-center text-slate-500" id="teacherEmpty">데이터가 없습니다.</div>
+
+<div class="hidden p-6 rounded-xl bg-white shadow text-center text-slate-500" id="teacherEmpty">
+데이터가 없습니다.
+</div>
+
 <div id="teacherContent">
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
 <div class="p-4 bg-white rounded-xl shadow">
 <h3 class="font-semibold mb-3">반별 수행률</h3>
 <canvas id="chartTeacherClass"></canvas>
 </div>
+
 <div class="p-4 bg-white rounded-xl shadow">
-<div class="flex items-center justify-between mb-3">
-<h3 class="font-semibold">반별·내용별 수행률</h3>
+<h3 class="font-semibold mb-3">반별·내용별 수행률</h3>
+<div class="overflow-auto max-h-[400px]" id="teacherSubjectTableContainer"></div>
 </div>
-<div class="overflow-auto max-h-[400px]" id="teacherSubjectTableContainer">
-</div>
-</div>
+
 </div>
 </div>
 </section>
+
+
 </main>
 </div>
-<div class="modal" id="modal">
-<div class="bg-white rounded-xl shadow-xl w-[min(720px,92vw)] p-4">
-<div class="flex items-center justify-between mb-3">
-<h4 class="font-semibold text-lg" id="modalTitle"></h4>
-<button class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm" id="modalClose">닫기</button>
-</div>
-<div class="overflow-auto">
-<table class="min-w-full text-sm">
-<thead class="bg-slate-50">
-<tr><th class="text-left px-2 py-2">반</th><th class="text-right px-2 py-2">수행</th><th class="text-right px-2 py-2">미수행</th><th class="text-right px-2 py-2">수행률</th></tr>
-</thead>
-<tbody id="modalBody"></tbody>
-</table>
-</div>
-</div>
-</div>
+
+<!-- ================================
+      모달 – 반 클릭시 미수행자 목록
+================================ -->
 <div class="modal" id="missModal">
 <div class="bg-white rounded-xl shadow-xl w-[min(920px,96vw)] p-4">
 <div class="flex items-center justify-between mb-3 gap-3">
@@ -146,6 +173,7 @@
 <button class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm" id="missClose">닫기</button>
 </div>
 </div>
+
 <div class="overflow-auto max-h-[70vh]">
 <table class="min-w-full text-sm">
 <thead class="bg-slate-50 sticky top-0">
@@ -161,57 +189,156 @@
 <tbody id="missBody"></tbody>
 </table>
 </div>
+
 </div>
 </div>
+
+<!-- ================================
+      데이터 업로드 박스
+================================ -->
 <div class="fixed bottom-4 right-4">
 <div class="bg-white rounded-xl shadow-lg p-3 flex items-center gap-2">
 <input accept=".xlsx,.csv" class="block text-sm" id="fileInput" type="file"/>
 <label class="inline-flex items-center gap-1 text-xs">
-<input class="rounded border" id="autoLoad" type="checkbox"/>
-        자동불러오기
-      </label>
+<input class="rounded border" id="autoLoad" type="checkbox"/> 자동불러오기
+</label>
 <button class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs" id="clearSaved">저장삭제</button>
 </div>
 </div>
+
+
 <script>
-let RAW=[];
+let RAW = [];
 let chartOverallClass, chartOverallStatus, chartTeacherClass;
 
-// ---------- 로컬 저장(LocalStorage) ----------
 const LS_KEYS = {
-  autoload: 'lancon_autoload',
-  data: 'lancon_data_json',
-  savedAt: 'lancon_saved_at'
+  autoload: "lancon_autoload",
+  data: "lancon_data_json",
+  savedAt: "lancon_saved_at",
 };
+
+// ---------- 공통 유틸 ----------
+
+function saveRangeToLocal() {
+  const sd = document.getElementById("startDate").value;
+  const ed = document.getElementById("endDate").value;
+  localStorage.setItem("lancon_range_start", sd);
+  localStorage.setItem("lancon_range_end", ed);
+}
+
+function parseDate(val) {
+  if (val == null) return null;
+  if (typeof val === "number") {
+    try {
+      const d = XLSX.SSF.parse_date_code(val);
+      return new Date(d.y, d.m - 1, d.d);
+    } catch {
+      return null;
+    }
+  }
+  const s = String(val).trim().replace(/[.\/]/g, "-");
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function fmtYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${da}`;
+}
+
+function normalizeStatus(v) {
+  const s = String(v || "").trim();
+  if (/과제안함/.test(s)) return "미수행";
+  if (/해당없음/.test(s)) return "제외";
+  if (/^\d+$/.test(s)) return "수행";
+  return "기타";
+}
+
+function rate(done, miss) {
+  return Math.round((done / ((done + miss) || 1)) * 100);
+}
+
+function getRange() {
+  const sd = document.getElementById("startDate").value;
+  const ed = document.getElementById("endDate").value;
+  const s = sd ? new Date(sd + "T00:00:00") : null;
+  const e = ed ? new Date(ed + "T23:59:59") : null;
+  return { s, e };
+}
+
+function inRange(d) {
+  const { s, e } = getRange();
+  if (!d) return false;
+  if (s && d < s) return false;
+  if (e && d > e) return false;
+  return true;
+}
+
+function updateRangeBadge() {
+  const sd = document.getElementById("startDate").value;
+  const ed = document.getElementById("endDate").value;
+  const badge = document.getElementById("rangeBadge");
+  badge.textContent = !sd && !ed ? "전체" : `${sd || ".."} ~ ${ed || ".."}`;
+}
+
+function mapRecord(r) {
+  const clean = {};
+  for (const k in r) {
+    const nk = String(k).replace(/\ufeff/g, "").trim();
+    const v = r[k];
+    clean[nk] = typeof v === "string" ? v.trim() : v;
+  }
+  const obj = {
+    날짜: clean["날짜"] ?? clean["date"] ?? clean["Date"] ?? "",
+    작성자: clean["작성자"] ?? clean["선생님"] ?? clean["Teacher"] ?? "",
+    과목: clean["과목"] ?? clean["제목"] ?? clean["유형"] ?? clean["subject"] ?? "",
+    반코드: clean["반코드"] ?? clean["반명"] ?? clean["반"] ?? clean["class"] ?? "",
+    학생명: clean["학생명"] ?? clean["학생"] ?? clean["이름"] ?? clean["student"] ?? "",
+    상태: clean["상태"] ?? clean["구분"] ?? clean["점수"] ?? clean["점수/비고"] ?? "",
+  };
+  for (const k in obj) if (typeof obj[k] === "string") obj[k] = obj[k].trim();
+  return obj;
+}
+
+function getFilteredRows() {
+  return RAW.filter((r) => {
+    const d = parseDate(r["날짜"]);
+    return inRange(d);
+  });
+}
+
+// ---------- 파일 로드 / 저장 ----------
 
 function saveToLocal(rows) {
   try {
     localStorage.setItem(LS_KEYS.data, JSON.stringify(rows));
     localStorage.setItem(LS_KEYS.savedAt, new Date().toISOString());
   } catch (e) {
-    console.warn('로컬 저장 실패', e);
-    alert('데이터가 너무 커서 저장하지 못했습니다. (브라우저 저장 한도 초과)');
+    console.warn(e);
   }
 }
 
 function loadFromLocal() {
-  const flag = localStorage.getItem(LS_KEYS.autoload) === '1';
-  const json = localStorage.getItem(LS_KEYS.data);
-  const autoEl = document.getElementById('autoLoad');
-  if (autoEl) autoEl.checked = flag;
+  const flag = localStorage.getItem(LS_KEYS.autoload) === "1";
+  const autoLoad = document.getElementById("autoLoad");
+  autoLoad.checked = flag;
 
+  const json = localStorage.getItem(LS_KEYS.data);
   if (flag && json) {
     try {
       const rows = JSON.parse(json);
       if (Array.isArray(rows) && rows.length) {
         RAW = rows;
         buildTeacherList();
-        showPage('page-overall');
         drawOverall();
         return true;
       }
     } catch (e) {
-      console.warn('저장 데이터 파싱 실패', e);
+      console.warn(e);
     }
   }
   return false;
@@ -222,500 +349,571 @@ function clearLocal() {
   localStorage.removeItem(LS_KEYS.savedAt);
 }
 
-// ---------- CSV/XLSX 파서: 인코딩 + 구분자 자동 ----------
-async function parseFile(file){
-  const isCSV=/\.csv$/i.test(file.name||'');
-  try{
-    if(isCSV){
-      const text=await file.text();
-      let json=readCSVText(text);
-      if(needsFallback(json)){
-        const buf=await file.arrayBuffer();
-        json=readArray(buf);
-        if(needsFallback(json)) json=readArray(buf,949)||readArray(buf,51949)||json;
+function readCSVText(text) {
+  try {
+    const lines = text.split(/\r?\n/);
+    const first = lines.find((l) => l.trim().length > 0) || "";
+    const cnt = {
+      comma: (first.match(/,/g) || []).length,
+      tab: (first.match(/\t/g) || []).length,
+      semi: (first.match(/;/g) || []).length,
+    };
+    let normalized = text;
+    if (cnt.tab > cnt.comma && cnt.tab >= cnt.semi)
+      normalized = text.replace(/\t/g, ",");
+    else if (cnt.semi > cnt.comma && cnt.semi > cnt.tab)
+      normalized = text.replace(/;/g, ",");
+
+    const wb = XLSX.read(normalized, { type: "string" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+  } catch {
+    return null;
+  }
+}
+
+function readArray(buf, codepage) {
+  try {
+    const opt = { type: "array" };
+    if (codepage) opt.codepage = codepage;
+    const wb = XLSX.read(buf, opt);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+  } catch {
+    return null;
+  }
+}
+
+async function parseFile(file) {
+  const isCSV = /\.csv$/i.test(file.name || "");
+  try {
+    if (isCSV) {
+      const text = await file.text();
+      let json = readCSVText(text);
+      if (!json || !json.length) {
+        const buf = await file.arrayBuffer();
+        json = readArray(buf, 949) || readArray(buf, 51949) || readArray(buf);
       }
-      return json||[];
-    }else{
-      const buf=await file.arrayBuffer();
-      return readArray(buf)||[];
+      return json || [];
+    } else {
+      const buf = await file.arrayBuffer();
+      return readArray(buf) || [];
     }
-  }catch(e){
-    const buf=await file.arrayBuffer();
-    return readArray(buf)||[];
+  } catch {
+    const buf = await file.arrayBuffer();
+    return readArray(buf) || [];
   }
 }
-function readCSVText(text){
-  try{
-    const lines=text.split(/\r?\n/);
-    const first=lines.find(l=>l.trim().length>0)||'';
-    const cnt={comma:(first.match(/,/g)||[]).length, tab:(first.match(/\t/g)||[]).length, semi:(first.match(/;/g)||[]).length};
-    let normalized=text;
-    if(cnt.tab>cnt.comma && cnt.tab>=cnt.semi) normalized=text.replace(/\t/g, ',');
-    else if(cnt.semi>cnt.comma && cnt.semi>cnt.tab) normalized=text.replace(/;/g, ',');
-    const wb=XLSX.read(normalized,{type:'string'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
-  }catch{ return null; }
-}
-function readArray(buf,codepage){
-  try{ const opts={type:'array'}; if(codepage) opts.codepage=codepage; const wb=XLSX.read(buf,opts); const ws=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false}); }catch{ return null; }
-}
-function needsFallback(json){
-  if(!json||!json.length) return true;
-  const keys=Object.keys(json[0]||{});
-  if(keys.length<=1) return true;
-  const headers=['날짜','작성자','제목','과목','반명','반코드','학생명','상태','구분','점수','점수/비고'];
-  return !headers.some(h=> keys.join('|').includes(h));
-}
 
-// ---------- 전처리 & 유틸 ----------
-function normalizeStatus(v){
-  const s=String(v||'').trim();
-  if(/과제안함/.test(s)) return '미수행';
-  if(/해당없음/.test(s)) return '제외';
-  if(/^\d+$/.test(s)) return '수행';
-  return '기타';
-}
-function parseDate(val){
-  if(val==null) return null;
-  if(typeof val==='number'){
-    try{
-      const d=XLSX.SSF.parse_date_code(val);
-      return new Date(d.y, d.m-1, d.d); // 로컬 자정
-    }catch{ return null; }
+async function loadFromServer() {
+  try {
+    const res = await fetch("example01.csv");
+    const text = await res.text();
+    const wb = XLSX.read(text, { type: "string" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+    RAW = (json || [])
+      .map(mapRecord)
+      .filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
+    saveToLocal(RAW);
+    buildTeacherList();
+    drawOverall();
+  } catch (e) {
+    console.warn("서버 데이터 로드 실패", e);
   }
-  const s=String(val).trim().replace(/[.\/]/g,'-');
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(m){
-    const y=+m[1], mo=+m[2]-1, da=+m[3];
-    return new Date(y, mo, da); // 로컬 자정
-  }
-  const d=new Date(s);
-  return isNaN(d)?null:new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-function getRange(){
-  const sd=document.getElementById('startDate').value;
-  const ed=document.getElementById('endDate').value;
-  const s = sd ? new Date(sd + 'T00:00:00') : null;             // 로컬 시작
-  const e = ed ? new Date(ed + 'T23:59:59.999') : null;         // 로컬 끝(포함)
-  return {s,e};
-}
-function inRange(d,{s,e}){if(!d)return false;if(s&&d<s)return false;if(e&&d>e)return false;return true;}
-function rate(done,miss){return Math.round((done/((done+miss)||1))*100)}
-function fmtLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`; }
-
-// ---------- 라우팅/네비 ----------
-function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function bindNavButtons(){
-  const goHome=()=>{ showPage('page-overall'); drawOverall(); };
-  const h=document.getElementById('btnHome'); if(h) h.addEventListener('click', goHome);
-  const b=document.getElementById('btnBack'); if(b) b.addEventListener('click', goHome);
 }
 
-// ---------- 집계 ----------
-function aggregate(rows, teacher){
-  const range=getRange();
-  let filtered=rows.filter(r=> inRange(parseDate(r['날짜']),range));
-  if(teacher) filtered=filtered.filter(r=>r['작성자']===teacher);
-  const byClass={}, bySubject={}, stat={수행:0,미수행:0,제외:0,기타:0};
-  for(const r of filtered){
-    const st=normalizeStatus(r['상태']); stat[st]++;
-    const c=r['반코드']||'(미지정)';
-    const subj=r['과목']||'(미지정)';
-    byClass[c]??={수행:0,미수행:0}; bySubject[subj]??={수행:0,미수행:0};
-    if(st==='수행'){byClass[c].수행++;bySubject[subj].수행++;}
-    if(st==='미수행'){byClass[c].미수행++;bySubject[subj].미수행++;}
-  }
-  return {stat,byClass,bySubject,count:filtered.length, filtered};
+// ---------- 화면 전환 / 네비 ----------
+
+function showPage(id) {
+  document.querySelectorAll(".page").forEach((p) =>
+    p.classList.remove("active")
+  );
+  document.getElementById(id).classList.add("active");
 }
 
-// ---------- 렌더: 전체 ----------
-function drawOverall(){
-  const range=getRange();
-  const filtered=RAW.filter(r=> inRange(parseDate(r['날짜']),range));
-  const emptyBox=document.getElementById('overallEmpty');
-  const content=document.getElementById('overallContent');
-  if(!filtered.length){ emptyBox.classList.remove('hidden'); content.classList.add('hidden'); return; }
-  emptyBox.classList.add('hidden'); content.classList.remove('hidden');
+function bindNavButtons() {
+  const btnHome = document.getElementById("btnHome");
+  const btnBack = document.getElementById("btnBack");
 
-  const stat={수행:0,미수행:0,제외:0,기타:0};
-  const tMap={};
-  for(const r of filtered){
-    const st=normalizeStatus(r['상태']); stat[st]++;
-    const t=r['작성자']||'(미지정)';
-    tMap[t]??={수행:0,미수행:0};
-    if(st==='수행')tMap[t].수행++;
-    if(st==='미수행')tMap[t].미수행++;
-  }
-  const done=stat.수행, miss=stat.미수행;
-  document.getElementById('kpiTotal').textContent=filtered.length;
-  document.getElementById('kpiDone').textContent=done;
-  document.getElementById('kpiMiss').textContent=miss;
-  document.getElementById('kpiRate').textContent=rate(done,miss)+'%';
-
-  let teachers=Object.keys(tMap);
-  const sort=document.getElementById('sortOverall').value;
-  if(sort==='rate') teachers.sort((a,b)=>{
-    const ra=tMap[a], rb=tMap[b];
-    return (rb.수행/(rb.수행+rb.미수행||1)) - (ra.수행/(ra.수행+ra.미수행||1));
-  }); else teachers.sort();
-
-  const tRates=teachers.map(k=> rate(tMap[k].수행,tMap[k].미수행));
-  const tooltips=teachers.map(k=> `${tMap[k].수행} 수행 / ${tMap[k].미수행} 미수행`);
-
-  if(chartOverallClass) chartOverallClass.destroy();
-  chartOverallClass=new Chart(document.getElementById('chartOverallClass'),{
-    type:'bar',
-    data:{labels:teachers,datasets:[{label:'수행률(%)',data:tRates}]},
-    options:{
-      responsive:true,
-      scales:{ y:{ beginAtZero:true, max:100 } },
-      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${ctx.formattedValue}% (${tooltips[ctx.dataIndex]})` } } },
-      onClick:(evt,els)=>{ if(els.length){ const idx=els[0].index; drawTeacherPage(teachers[idx]); } },
-      onHover:(evt,els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; }
-    }
+  btnHome.addEventListener("click", () => {
+    document
+      .querySelectorAll(".teacher-link")
+      .forEach((el) => el.classList.remove("active"));
+    showPage("page-overall");
   });
 
-  if(chartOverallStatus) chartOverallStatus.destroy();
-  chartOverallStatus=new Chart(document.getElementById('chartOverallStatus'),{
-    type:'pie',
-    data:{labels:Object.keys(stat),datasets:[{data:Object.values(stat)}]},
-    options:{
-      onClick:(evt,els)=>{
-        if(!els.length) return;
-        const label = chartOverallStatus.data.labels[els[0].index];
-        if(label==='미수행'){ openMissList({ title:'미수행자 목록' }); }
-      },
-      plugins:{ }
-    }
+  btnBack.addEventListener("click", () => {
+    showPage("page-overall");
   });
-
-  // KPI 미수행 클릭 시 상세 열기
-  document.getElementById('kpiMiss').onclick = ()=> openMissList({ title:'미수행자 목록' });
 }
 
-// ---------- 렌더: 선생님 페이지 ----------
-function drawTeacherPage(name){
-  const aggr=aggregate(RAW,name);
-  const emptyBox=document.getElementById('teacherEmpty');
-  const content=document.getElementById('teacherContent');
-  if(!aggr.count){ emptyBox.classList.remove('hidden'); content.classList.add('hidden'); return; }
-  emptyBox.classList.add('hidden'); content.classList.remove('hidden');
-  document.getElementById('teacherName').textContent=name;
-  document.querySelectorAll('#teacherList .teacher-link').forEach(li=>{li.classList.remove('active'); if(li.textContent===name) li.classList.add('active');});
+// ---------- 선생님 목록 ----------
 
-  // 반별 수행률
-  const cLabels=Object.keys(aggr.byClass);
-  const cRates=cLabels.map(k=> rate(aggr.byClass[k].수행, aggr.byClass[k].미수행));
-  if(chartTeacherClass) chartTeacherClass.destroy();
-  chartTeacherClass=new Chart(document.getElementById('chartTeacherClass'),{
-    type:'bar', data:{labels:cLabels,datasets:[{label:'수행률(%)',data:cRates}]},
-    options:{ responsive:true, scales:{y:{beginAtZero:true,max:100}}, plugins:{legend:{display:false}} }
+function buildTeacherList() {
+  const ul = document.getElementById("teacherList");
+  const search = document
+    .getElementById("teacherSearch")
+    .value.trim()
+    .toLowerCase();
+
+  const rows = getFilteredRows();
+  const byTeacher = {};
+
+  rows.forEach((r) => {
+    const t = r["작성자"] || "(미지정)";
+    const st = normalizeStatus(r["상태"]);
+    if (!byTeacher[t]) byTeacher[t] = { done: 0, miss: 0 };
+    if (st === "수행") byTeacher[t].done++;
+    if (st === "미수행") byTeacher[t].miss++;
   });
 
-  // 내용별 수행률 - 테이블로 변경
-  renderSubjectChart(aggr, name);
-  showPage('page-teacher');
-}
+  const list = Object.entries(byTeacher).map(([name, v]) => ({
+    name,
+    done: v.done,
+    miss: v.miss,
+    rate: rate(v.done, v.miss),
+  }));
 
-function renderSubjectChart(aggr, teacherName){
-  const container=document.getElementById('teacherSubjectTableContainer');
-  container.innerHTML = ''; // Clear previous content
+  list.sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
-  const rows=aggr.filtered; // 기간+선생님 필터된 원본 행
-  const bucket={};
-  for(const r of rows){
-    const subj=r['과목']||'(미지정)';
-    const cls=r['반코드']||'(미지정)';
-    const st=normalizeStatus(r['상태']);
-    bucket[subj] ??= {};
-    bucket[subj][cls] ??= {수행:0,미수행:0};
-    if(st==='수행') bucket[subj][cls].수행++;
-    if(st==='미수행') bucket[subj][cls].미수행++;
-  }
-
-  // Flatten data for sorting and rendering
-  const flatData = [];
-  Object.entries(bucket).forEach(([subj, classes])=>{
-    Object.entries(classes).forEach(([cls, v])=>{
-      flatData.push({
-        class: cls,
-        subject: subj,
-        done: v.수행,
-        miss: v.미수행,
-        rate: rate(v.수행, v.미수행)
-      });
-    });
-  });
-
-  // Sort by class name, then by subject
-  flatData.sort((a,b) => {
-    if (a.class < b.class) return -1;
-    if (a.class > b.class) return 1;
-    if (a.subject < b.subject) return -1;
-    if (a.subject > b.subject) return 1;
-    return 0;
-  });
-
-  if (!flatData.length) {
-    container.innerHTML = '<div class="text-center text-slate-500 py-4">데이터가 없습니다.</div>';
-    return;
-  }
-
-  const table = document.createElement('table');
-  table.className = 'min-w-full text-sm';
-  table.innerHTML = `
-    <thead class="bg-slate-50 sticky top-0">
-      <tr>
-        <th class="text-left px-2 py-2">반</th>
-        <th class="text-left px-2 py-2">내용</th>
-        <th class="text-right px-2 py-2">수행</th>
-        <th class="text-right px-2 py-2">미수행</th>
-        <th class="text-right px-2 py-2">수행률</th>
-      </tr>
-    </thead>
-  `;
-
-  const tbody = document.createElement('tbody');
-  flatData.forEach(item => {
-    
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50 cursor-pointer';
-    tr.innerHTML = `
-      <td class="px-2 py-1">${item.class}</td>
-      <td class="px-2 py-1">${item.subject}</td>
-      <td class="px-2 py-1 text-right">${item.done}</td>
-      <td class="px-2 py-1 text-right">${item.miss}</td>
-      <td class="px-2 py-1 text-right">${item.rate}%</td>
+  ul.innerHTML = "";
+  list.forEach((t) => {
+    if (search && !t.name.toLowerCase().includes(search)) return;
+    const li = document.createElement("li");
+    li.className =
+      "teacher-link px-2 py-1 rounded hover:bg-slate-100 flex justify-between items-center";
+    li.dataset.name = t.name;
+    li.innerHTML = `
+      <span>${t.name}</span>
+      <span class="text-xs text-slate-500">${t.rate}%</span>
     `;
-    tr.addEventListener('click', () => {
-      openMissList({
-        teacher: teacherName,
-        subject: item.subject,
-        classCode: item.class,
-        title: `미수행자 · ${teacherName} · ${item.class} · ${item.subject}`
-      });
+    li.addEventListener("click", () => {
+      document
+        .querySelectorAll(".teacher-link")
+        .forEach((el) => el.classList.remove("active"));
+      li.classList.add("active");
+      drawTeacherPage(t.name);
     });
-    tbody.appendChild(tr);
-    
-  });
-
-  table.appendChild(tbody);
-  container.appendChild(table);
-}
-
-
-// ---------- 모달 (반별 합계 -> 반 클릭 시 미수행자 상세) ----------
-function openModalForSubject(subject, classMap, teacherName){
-  const modal=document.getElementById('modal');
-  const body=document.getElementById('modalBody');
-  const title=document.getElementById('modalTitle');
-  title.textContent=`내용별 상세: ${subject}`;
-  body.innerHTML='';
-  Object.entries(classMap).forEach(([cls, v])=>{
-    const tr=document.createElement('tr');
-    const r=rate(v.수행, v.미수행);
-    tr.innerHTML=`<td class="px-2 py-1">${cls}</td><td class="px-2 py-1 text-right">${v.수행}</td><td class="px-2 py-1 text-right">${v.미수행}</td><td class="px-2 py-1 text-right">${r}%</td>`;
-    tr.className='hover:bg-slate-50 cursor-pointer';
-    tr.addEventListener('click', ()=>{
-      modal.classList.remove('active');
-      openMissList({ teacher: teacherName, subject: subject, classCode: cls, title:`미수행자 · ${teacherName} · ${cls} · ${subject}` });
-    });
-    body.appendChild(tr);
-  });
-  modal.classList.add('active');
-}
-
-// ---------- 미수행자 상세 모달 ----------
-function formatYMD(d){
-  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${da}`;
-}
-/** filter = { teacher?:string, subject?:string, classCode?:string, title?:string } */
-function openMissList(filter={}){
-  const range=getRange();
-  const rows = RAW.filter(r=>{
-    const inDay = inRange(parseDate(r['날짜']), range);
-    const isMiss = normalizeStatus(r['상태'])==='미수행';
-    if(!inDay || !isMiss) return false;
-    if(filter.teacher && r['작성자']!==filter.teacher) return false;
-    if(filter.subject && (r['과목']||'(미지정)')!==filter.subject) return false;
-    if(filter.classCode && (r['반코드']||'(미지정)')!==filter.classCode) return false;
-    return true;
-  });
-
-  // 최신 날짜 우선
-  rows.sort((a,b)=> (parseDate(b['날짜'])||0) - (parseDate(a['날짜'])||0));
-
-  const titleParts=['미수행자 목록'];
-  if(filter.teacher) titleParts.push(`· ${filter.teacher}`);
-  if(filter.subject) titleParts.push(`· ${filter.subject}`);
-  if(filter.classCode) titleParts.push(`· ${filter.classCode}`);
-  document.getElementById('missTitle').textContent = (filter.title || titleParts.join(' ')) + ` (${rows.length}명)`;
-
-  const tbody=document.getElementById('missBody');
-  tbody.innerHTML='';
-  rows.forEach(r=>{
-    const d=parseDate(r['날짜']);
-    const tr=document.createElement('tr');
-    tr.className='hover:bg-slate-50';
-    tr.innerHTML = `
-      <td class="px-2 py-1">${d?formatYMD(d):''}</td>
-      <td class="px-2 py-1">${r['학생명']||''}</td>
-      <td class="px-2 py-1">${r['반코드']||'(미지정)'}</td>
-      <td class="px-2 py-1">${r['과목']||'(미지정)'}</td>
-      <td class="px-2 py-1">${r['작성자']||''}</td>
-      <td class="px-2 py-1">${r['상태']||''}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  const search = document.getElementById('missSearch');
-  search.value='';
-  search.oninput = ()=>{
-    const q=search.value.trim().toLowerCase();
-    [...tbody.querySelectorAll('tr')].forEach(tr=>{
-      const text = tr.innerText.toLowerCase();
-      tr.style.display = text.includes(q) ? '' : 'none';
-    });
-  };
-
-  document.getElementById('missModal').classList.add('active');
-}
-
-function bindMissModal(){
-  document.getElementById('missClose').addEventListener('click',()=> {
-    document.getElementById('missModal').classList.remove('active');
-  });
-}
-
-// ---------- 사이드바 목록 & 검색 ----------
-function buildTeacherList(){
-  const ul=document.getElementById('teacherList');
-  const q=(document.getElementById('teacherSearch').value||'').trim().toLowerCase();
-  const names=[...new Set(RAW.map(r=> String(r['작성자']||'').trim()).filter(Boolean))].sort();
-  const list=q? names.filter(n=> n.toLowerCase().includes(q)) : names;
-  ul.innerHTML='';
-  if(!list.length){ ul.innerHTML='<li class="text-slate-400">(없음)</li>'; return; }
-  list.forEach(name=>{
-    const li=document.createElement('li');
-    li.textContent=name;
-    li.className='teacher-link block px-2 py-1 rounded hover:bg-indigo-50';
-    li.addEventListener('click',()=> drawTeacherPage(name));
     ul.appendChild(li);
   });
 }
 
-// ---------- 기간 프리셋 & 이벤트 ----------
-function setRange(s,e){
-  const sd=document.getElementById('startDate');
-  const ed=document.getElementById('endDate');
-  sd.value=s?fmtLocal(s):''; ed.value=e?fmtLocal(e):'';
-  drawOverall();
-}
-function updateRangeBadge(){
-  const sd=document.getElementById('startDate').value;
-  const ed=document.getElementById('endDate').value;
-  const badge=document.getElementById('rangeBadge');
-  if(!sd && !ed) { badge.textContent='전체'; return; }
-  badge.textContent = `${sd||'..'} ~ ${ed||'..'}`;
-}
-function activateChip(id){
-  document.querySelectorAll('.chip').forEach(c=> c.classList.remove('active'));
-  if(id) { const el=document.getElementById(id); if(el) el.classList.add('active'); }
-}
-function bindRangeEvents(){
-  const sd=document.getElementById('startDate');
-  const ed=document.getElementById('endDate');
-  const rerender=()=>{ updateRangeBadge(); activateChip(null); const onTeacher=document.getElementById('page-teacher').classList.contains('active'); onTeacher? drawTeacherPage(document.getElementById('teacherName').textContent): drawOverall(); };
-  sd.addEventListener('change',rerender); ed.addEventListener('change',rerender);
-  const today=new Date();
-  document.getElementById('rngAll').addEventListener('click',()=>{ setRange(null,null); updateRangeBadge(); activateChip('rngAll'); });
-  document.getElementById('rngToday').addEventListener('click',()=>{ setRange(today,today); updateRangeBadge(); activateChip('rngToday'); });
-  document.getElementById('rngWeekMon').addEventListener('click',()=>{ const d=new Date(); const day=(d.getDay()+6)%7; const s=new Date(d); s.setDate(d.getDate()-day); const e=new Date(s); e.setDate(s.getDate()+6); setRange(s,e); updateRangeBadge(); activateChip('rngWeekMon'); });
-  document.getElementById('rngMonth').addEventListener('click',()=>{ const d=new Date(); const s=new Date(d.getFullYear(),d.getMonth(),1); const e=new Date(d.getFullYear(),d.getMonth()+1,0); setRange(s,e); updateRangeBadge(); activateChip('rngMonth'); });
-  document.getElementById('rngLastWeek').addEventListener('click',()=>{ const d=new Date(); const day=(d.getDay()+6)%7; const e=new Date(d); e.setDate(d.getDate()-day-1); const s=new Date(e); s.setDate(e.getDate()-6); setRange(s,e); updateRangeBadge(); activateChip('rngLastWeek'); });
-  document.getElementById('rngLastMonth').addEventListener('click',()=>{ const d=new Date(); const s=new Date(d.getFullYear(),d.getMonth()-1,1); const e=new Date(d.getFullYear(),d.getMonth(),0); setRange(s,e); updateRangeBadge(); activateChip('rngLastMonth'); });
-  document.addEventListener('click', (ev)=>{ if(ev.target && ev.target.id==='resetFilter'){ setRange(null,null); updateRangeBadge(); activateChip('rngAll'); } });
-  updateRangeBadge(); activateChip('rngAll');
-}
+// ---------- 전체 대시보드 ----------
 
-// ---------- 초기 바인딩 & 업로드 ----------
-function bindApp(){
-  bindNavButtons();
-  bindRangeEvents();
-  document.getElementById('modalClose').addEventListener('click',()=> document.getElementById('modal').classList.remove('active'));
-  document.getElementById('teacherSearch').addEventListener('input', buildTeacherList);
-  document.getElementById('sortOverall').addEventListener('change', drawOverall);
+function drawOverall() {
+  const rows = getFilteredRows();
+  const emptyBox = document.getElementById("overallEmpty");
+  const content = document.getElementById("overallContent");
 
-  // 자동불러오기 스위치 & 저장삭제 버튼
-  const autoEl = document.getElementById('autoLoad');
-  const clearBtn = document.getElementById('clearSaved');
-  if (autoEl) {
-    autoEl.addEventListener('change', ()=>{
-      localStorage.setItem(LS_KEYS.autoload, autoEl.checked ? '1' : '0');
-    });
-  }
-  if (clearBtn) {
-    clearBtn.addEventListener('click', ()=>{
-      clearLocal();
-      alert('저장된 데이터를 삭제했습니다.');
-    });
+  if (!rows.length) {
+    emptyBox.classList.remove("hidden");
+    content.classList.add("hidden");
+  } else {
+    emptyBox.classList.add("hidden");
+    content.classList.remove("hidden");
   }
 
-  // 업로드 시 파싱 + 렌더 + (옵션)저장
-  document.getElementById('fileInput').addEventListener('change', async e=>{
-    const file=e.target.files[0]; if(!file) return;
-    const parsed=await parseFile(file);
-    RAW=(parsed||[]).map(mapRecord).filter(r=> Object.values(r).some(v=> String(v??'').trim()!==''));
-    buildTeacherList();
-    showPage('page-overall');
-    drawOverall();
-    if (autoEl && autoEl.checked) {
-      saveToLocal(RAW);
+  const statusCounts = { 수행: 0, 미수행: 0, 제외: 0, 기타: 0 };
+
+  rows.forEach((r) => {
+    const st = normalizeStatus(r["상태"]);
+    if (statusCounts[st] == null) statusCounts["기타"]++;
+    else statusCounts[st]++;
+  });
+
+  const total = rows.length;
+  const done = statusCounts["수행"];
+  const miss = statusCounts["미수행"];
+  const overallRate = rate(done, miss);
+
+  document.getElementById("kpiTotal").textContent = total;
+  document.getElementById("kpiDone").textContent = done;
+  document.getElementById("kpiMiss").textContent = miss;
+  document.getElementById("kpiRate").textContent = overallRate + "%";
+
+  // 선생님별 수행률
+  const byTeacher = {};
+  rows.forEach((r) => {
+    const t = r["작성자"] || "(미지정)";
+    const st = normalizeStatus(r["상태"]);
+    if (!byTeacher[t]) byTeacher[t] = { done: 0, miss: 0 };
+    if (st === "수행") byTeacher[t].done++;
+    if (st === "미수행") byTeacher[t].miss++;
+  });
+
+  const tLabels = Object.keys(byTeacher);
+  const tRates = tLabels.map((t) =>
+    rate(byTeacher[t].done, byTeacher[t].miss)
+  );
+
+  if (chartOverallClass) chartOverallClass.destroy();
+  const ctx1 = document.getElementById("chartOverallClass");
+  chartOverallClass = new Chart(ctx1, {
+    type: "bar",
+    data: {
+      labels: tLabels,
+      datasets: [{ label: "수행률(%)", data: tRates }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, max: 100 } },
+    },
+  });
+
+  // 상태 분포
+  if (chartOverallStatus) chartOverallStatus.destroy();
+  const ctx2 = document.getElementById("chartOverallStatus");
+  chartOverallStatus = new Chart(ctx2, {
+    type: "doughnut",
+    data: {
+      labels: ["수행", "미수행", "제외", "기타"],
+      datasets: [
+        {
+          data: [
+            statusCounts["수행"],
+            statusCounts["미수행"],
+            statusCounts["제외"],
+            statusCounts["기타"],
+          ],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+
+  buildTeacherList();
+}
+
+// ---------- 선생님 상세 ----------
+
+function aggregateTeacher(name) {
+  const rows = getFilteredRows().filter((r) => (r["작성자"] || "(미지정)") === name);
+  const byClass = {};
+  const byClassSubject = {};
+
+  rows.forEach((r) => {
+    const cls = r["반코드"] || "(미지정)";
+    const subj = r["과목"] || "(과목없음)";
+    const st = normalizeStatus(r["상태"]);
+
+    if (!byClass[cls]) byClass[cls] = { done: 0, miss: 0 };
+    if (!byClassSubject[cls]) byClassSubject[cls] = {};
+    if (!byClassSubject[cls][subj])
+      byClassSubject[cls][subj] = { done: 0, miss: 0 };
+
+    if (st === "수행") {
+      byClass[cls].done++;
+      byClassSubject[cls][subj].done++;
+    } else if (st === "미수행") {
+      byClass[cls].miss++;
+      byClassSubject[cls][subj].miss++;
     }
   });
 
+  return { count: rows.length, byClass, byClassSubject };
+}
+
+function renderSubjectChart(aggr) {
+  const container = document.getElementById("teacherSubjectTableContainer");
+  container.innerHTML = "";
+
+  const table = document.createElement("table");
+  table.className = "min-w-full text-sm border-collapse";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th class="border px-2 py-1 text-left">반</th>
+        <th class="border px-2 py-1 text-left">과목/내용</th>
+        <th class="border px-2 py-1 text-right">수행</th>
+        <th class="border px-2 py-1 text-right">미수행</th>
+        <th class="border px-2 py-1 text-right">수행률</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector("tbody");
+
+  Object.keys(aggr.byClassSubject)
+    .sort()
+    .forEach((cls) => {
+      const subjMap = aggr.byClassSubject[cls];
+      Object.keys(subjMap)
+        .sort()
+        .forEach((subj) => {
+          const v = subjMap[subj];
+          const r = rate(v.done, v.miss);
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="border px-2 py-1">${cls}</td>
+            <td class="border px-2 py-1">${subj}</td>
+            <td class="border px-2 py-1 text-right">${v.done}</td>
+            <td class="border px-2 py-1 text-right">${v.miss}</td>
+            <td class="border px-2 py-1 text-right">${r}%</td>
+          `;
+          tbody.appendChild(tr);
+        });
+    });
+
+  container.appendChild(table);
+}
+
+function drawTeacherPage(name) {
+  const aggr = aggregateTeacher(name);
+  const emptyBox = document.getElementById("teacherEmpty");
+  const content = document.getElementById("teacherContent");
+
+  if (!aggr.count) {
+    emptyBox.classList.remove("hidden");
+    content.classList.add("hidden");
+    showPage("page-teacher");
+    return;
+  }
+
+  emptyBox.classList.add("hidden");
+  content.classList.remove("hidden");
+
+  document.getElementById("teacherName").textContent = name;
+
+  // 🔥 print_miss.html에서 사용할 값 저장
+  localStorage.setItem("lancon_selected_teacher", name);
+  saveRangeToLocal();
+
+  const labels = Object.keys(aggr.byClass);
+  const data = labels.map((cls) =>
+    rate(aggr.byClass[cls].done, aggr.byClass[cls].miss)
+  );
+
+  if (chartTeacherClass) chartTeacherClass.destroy();
+  chartTeacherClass = new Chart(document.getElementById("chartTeacherClass"), {
+    type: "bar",
+    data: { labels, datasets: [{ label: "수행률(%)", data }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, max: 100 } },
+    },
+  });
+
+  renderSubjectChart(aggr);
+  showPage("page-teacher");
+}
+
+// ---------- 미수행 모달 ----------
+
+function openMissModal() {
+  const modal = document.getElementById("missModal");
+  const body = document.getElementById("missBody");
+  const title = document.getElementById("missTitle");
+  const searchInput = document.getElementById("missSearch");
+
+  const rowsAll = getFilteredRows().filter(
+    (r) => normalizeStatus(r["상태"]) === "미수행"
+  );
+
+  title.textContent = "선택된 기간 미수행 목록";
+  body.innerHTML = "";
+
+  function renderList(filter) {
+    body.innerHTML = "";
+    const lower = (filter || "").toLowerCase();
+
+    rowsAll.forEach((r) => {
+      const d = parseDate(r["날짜"]);
+      const ymd = d ? fmtYMD(d) : "";
+      const line =
+        `${ymd} ${r["학생명"]} ${r["반코드"]} ${r["과목"]} ${r["작성자"]}`.toLowerCase();
+      if (lower && !line.includes(lower)) return;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="px-2 py-1">${ymd}</td>
+        <td class="px-2 py-1">${r["학생명"]}</td>
+        <td class="px-2 py-1">${r["반코드"]}</td>
+        <td class="px-2 py-1">${r["과목"]}</td>
+        <td class="px-2 py-1">${r["작성자"]}</td>
+        <td class="px-2 py-1">${r["상태"]}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  renderList("");
+  searchInput.value = "";
+  searchInput.oninput = () => renderList(searchInput.value);
+
+  modal.classList.add("active");
+}
+
+function bindMissModal() {
+  const modal = document.getElementById("missModal");
+  const closeBtn = document.getElementById("missClose");
+  const kpiMiss = document.getElementById("kpiMiss");
+
+  kpiMiss.addEventListener("click", () => openMissModal());
+
+  closeBtn.addEventListener("click", () => {
+    modal.classList.remove("active");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.remove("active");
+  });
+}
+
+// ---------- 기간 선택(빠른 선택) ----------
+
+function bindRangeEvents() {
+  const d = new Date();
+  const startDate = document.getElementById("startDate");
+  const endDate = document.getElementById("endDate");
+
+  // 초기값: 로컬스토리지에 저장된 기간이 있으면 불러오기
+  const savedS = localStorage.getItem("lancon_range_start");
+  const savedE = localStorage.getItem("lancon_range_end");
+  if (savedS) startDate.value = savedS;
+  if (savedE) endDate.value = savedE;
+  updateRangeBadge();
+
+  document.getElementById("rngAll").onclick = () => {
+    startDate.value = "";
+    endDate.value = "";
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  document.getElementById("rngToday").onclick = () => {
+    const s = fmtYMD(d);
+    startDate.value = s;
+    endDate.value = s;
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  document.getElementById("rngWeekMon").onclick = () => {
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7;
+    const s = new Date(now);
+    s.setDate(now.getDate() - day);
+    const e = new Date(s);
+    e.setDate(s.getDate() + 6);
+    startDate.value = fmtYMD(s);
+    endDate.value = fmtYMD(e);
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  document.getElementById("rngMonth").onclick = () => {
+    const now = new Date();
+    const s = new Date(now.getFullYear(), now.getMonth(), 1);
+    const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    startDate.value = fmtYMD(s);
+    endDate.value = fmtYMD(e);
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  document.getElementById("rngLastWeek").onclick = () => {
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7;
+    const e = new Date(now);
+    e.setDate(now.getDate() - day - 1);
+    const s = new Date(e);
+    s.setDate(e.getDate() - 6);
+    startDate.value = fmtYMD(s);
+    endDate.value = fmtYMD(e);
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  document.getElementById("rngLastMonth").onclick = () => {
+    const now = new Date();
+    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const e = new Date(now.getFullYear(), now.getMonth(), 0);
+    startDate.value = fmtYMD(s);
+    endDate.value = fmtYMD(e);
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  };
+
+  // 날짜 직접 변경
+  startDate.addEventListener("change", () => {
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  });
+  endDate.addEventListener("change", () => {
+    updateRangeBadge();
+    saveRangeToLocal();
+    drawOverall();
+  });
+}
+
+// ---------- 초기 실행 ----------
+
+document.addEventListener("DOMContentLoaded", () => {
+  const fileInput = document.getElementById("fileInput");
+  const autoLoad = document.getElementById("autoLoad");
+  const clearSaved = document.getElementById("clearSaved");
+  const teacherSearch = document.getElementById("teacherSearch");
+  const resetFilterBtn = document.getElementById("resetFilter");
+
+  bindNavButtons();
+  bindRangeEvents();
   bindMissModal();
 
-// 수정
-loadFromServer().catch(()=>{}).finally(()=>{ if(!RAW.length) loadFromLocal(); });
+  teacherSearch.addEventListener("input", () => buildTeacherList());
 
-
-}
-
-function mapRecord(r){
-  const clean={};
-  for(const k in r){const nk=String(k).replace(/\ufeff/g,'').trim();const v=r[k];clean[nk]=(typeof v==='string')?v.trim():v;}
-  const obj={
-    '날짜':clean['날짜']??clean['date']??clean['Date']??'',
-    '작성자':clean['작성자']??clean['선생님']??clean['Teacher']??'',
-    '과목':clean['과목']??clean['제목']??clean['유형']??clean['subject']??'',
-    '반코드':clean['반코드']??clean['반명']??clean['반']??clean['class']??'',
-    '학생명':clean['학생명']??clean['학생']??clean['이름']??clean['student']??'',
-    '상태':clean['상태']??clean['구분']??clean['점수']??clean['점수/비고']??''
-  };
-  for(const k in obj){if(typeof obj[k]==='string')obj[k]=obj[k].trim();}
-  return obj;
-}
-// ---------- 서버 CSV 불러오기 ----------
-async function loadFromServer() {
-  try {
-    const res = await fetch('example01.csv');   // index.html과 같은 위치라면 이렇게
-    const text = await res.text();
-    const json = readCSVText(text);
-    RAW = (json || []).map(mapRecord);
-    buildTeacherList();
-    showPage('page-overall');
-    drawOverall();
-  } catch (e) {
-    console.error('서버 데이터 로드 실패', e);
+  if (resetFilterBtn) {
+    resetFilterBtn.addEventListener("click", () => {
+      document.getElementById("startDate").value = "";
+      document.getElementById("endDate").value = "";
+      updateRangeBadge();
+      saveRangeToLocal();
+      drawOverall();
+    });
   }
-}
 
-// 부트스트랩
+  autoLoad.addEventListener("change", () => {
+    localStorage.setItem(LS_KEYS.autoload, autoLoad.checked ? "1" : "0");
+    if (autoLoad.checked && RAW.length) saveToLocal(RAW);
+  });
 
-bindApp();
+  clearSaved.addEventListener("click", () => {
+    clearLocal();
+    alert("저장된 데이터(메인)를 삭제했습니다.");
+  });
+
+  fileInput.addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const parsed = await parseFile(f);
+    RAW = (parsed || [])
+      .map(mapRecord)
+      .filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
+    if (autoLoad.checked) saveToLocal(RAW);
+    drawOverall();
+  });
+
+  // 최초 로드: local → server 순
+  if (!loadFromLocal()) {
+    loadFromServer();
+  } else {
+    drawOverall();
+  }
+});
 </script>
+
+
 </body>
 </html>

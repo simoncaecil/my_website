@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미수행자 + 조치 인쇄</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+  body { background: #f9fafb; padding: 20px; font-family: ui-sans-serif, system-ui; }
+  .print-hide { display: block; }
+  @media print {
+    .print-hide { display: none !important; }
+    body { background: white; padding: 0; margin: 0; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+
+<body>
+
+<!-- 인쇄 버튼 -->
+<div class="print-hide mb-4">
+  <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 text-white rounded-md">
+    인쇄하기 (Print)
+  </button>
+</div>
+
+<h1 class="text-2xl font-bold mb-1">미수행자 + 조치 기록</h1>
+
+<!-- ★★ 추가된 안내문구 ★★ -->
+<div class="mb-3 text-sm leading-relaxed text-slate-700">
+  <p>조치에는 <strong>1번(수업 중 처리), 2번(Detention), 3번(재부과)</strong> 중 번호만 적어주세요.</p>
+  <p>확인란에는 조치대로 처리되었는지 확인 후 <strong>체크표시</strong>를 해주세요.</p>
+</div>
+
+<p id="info" class="text-sm text-slate-600 mb-4"></p>
+
+<table class="min-w-full border text-sm bg-white">
+  <thead class="bg-slate-100">
+    <tr>
+      <th class="border px-2 py-1 text-left">날짜</th>
+      <th class="border px-2 py-1 text-left">학생</th>
+      <th class="border px-2 py-1 text-left">반</th>
+      <th class="border px-2 py-1 text-left">과목</th>
+      <th class="border px-2 py-1 text-left">상태</th>
+      <th class="border px-2 py-1 text-left">조치</th>
+      <th class="border px-2 py-1 text-left">확인</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<script>
+/* ---------------------------------------------------------
+    유틸
+--------------------------------------------------------- */
+function fmtYMD(d){
+  if(!(d instanceof Date)) return "";
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseDate(val){
+  if(val==null) return null;
+  if(typeof val==='number'){
+    try{
+      const d=XLSX.SSF.parse_date_code(val);
+      return new Date(d.y, d.m-1, d.d);
+    }catch{return null;}
+  }
+  const s=String(val).trim().replace(/[.\/]/g,'-');
+  const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(s);
+  return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+
+function normalizeStatus(v){
+  const s=String(v||'').trim();
+  if(/과제안함/.test(s)) return '미수행';
+  if(/해당없음/.test(s)) return '제외';
+  if(/^\d+$/.test(s)) return '수행';
+  return '기타';
+}
+
+function mapRecord(r){
+  const clean={};
+  for(const k in r){
+    const nk=String(k).replace(/\ufeff/g,'').trim();
+    const v=r[k];
+    clean[nk]=(typeof v==='string')?v.trim():v;
+  }
+  return {
+    '날짜': clean['날짜']??clean['date']??clean['Date']??'',
+    '학생명': clean['학생명']??clean['학생']??clean['student']??'',
+    '반코드': clean['반코드']??clean['반명']??clean['반']??'',
+    '과목': clean['과목']??clean['subject']??'',
+    '작성자': clean['작성자']??clean['선생님']??clean['Teacher']??'',
+    '상태': clean['상태']??clean['구분']??clean['점수']??''
+  };
+}
+
+function inRange(d, s, e){
+  if(!d) return false;
+  if(s && d < s) return false;
+  if(e && d > e) return false;
+  return true;
+}
+
+/* ---------------------------------------------------------
+    RAW 로딩
+--------------------------------------------------------- */
+async function loadFromServer(){
+  try{
+    const res=await fetch("example01.csv");
+    const text=await res.text();
+    const wb=XLSX.read(text,{type:'string'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    let json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+    return json.map(mapRecord);
+  }catch{return null;}
+}
+
+async function loadRAW(){
+  if(window.opener && window.opener.RAW){
+    return window.opener.RAW;
+  }
+  const txt=localStorage.getItem("lancon_data_json");
+  if(txt){
+    try{
+      const arr=JSON.parse(txt);
+      if(Array.isArray(arr)&&arr.length) return arr;
+    }catch{}
+  }
+  return await loadFromServer() || [];
+}
+
+/* ---------------------------------------------------------
+    ACTIONS
+--------------------------------------------------------- */
+function loadActions(){
+  const txt=localStorage.getItem("lancon_interventions_v3");
+  if(!txt) return [];
+  try{
+    const arr=JSON.parse(txt);
+    return Array.isArray(arr)?arr:[];
+  }catch{return [];}
+}
+
+function makeKey(r){
+  const d=parseDate(r["날짜"]);
+  return [
+    d?fmtYMD(d):"",
+    r["학생명"]||"",
+    r["반코드"]||"",
+    r["과목"]||""
+  ].join("|");
+}
+
+/* ---------------------------------------------------------
+    렌더링
+--------------------------------------------------------- */
+function render(){
+  const tbody=document.getElementById("tbody");
+  tbody.innerHTML="";
+
+  const teacher = localStorage.getItem("lancon_selected_teacher") || "";
+  const s = localStorage.getItem("lancon_range_start") || "";
+  const e = localStorage.getItem("lancon_range_end")   || "";
+
+  const start = s ? new Date(s+"T00:00:00") : null;
+  const end   = e ? new Date(e+"T23:59:59") : null;
+
+  document.getElementById("info").textContent =
+    `담임: ${teacher || "전체"} / 기간: ${s || "..."} ~ ${e || "..."}`;
+
+  const actions = loadActions();
+
+  const rows = window.RAW_DATA
+    .map(mapRecord)
+    .filter(r=>{
+      const d=parseDate(r["날짜"]);
+      if(!inRange(d,start,end)) return false;
+      if(teacher && r["작성자"]!==teacher) return false;
+      return normalizeStatus(r["상태"])==="미수행";
+    })
+    .sort((a,b)=>parseDate(b["날짜"])-parseDate(a["날짜"]));
+
+  rows.forEach(r=>{
+    const key=makeKey(r);
+    const act=actions.find(a=>a.key===key) || {action:"",resolved:false};
+
+    const d=parseDate(r["날짜"]);
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td class="border px-2 py-1">${d?fmtYMD(d):""}</td>
+      <td class="border px-2 py-1">${r["학생명"]}</td>
+      <td class="border px-2 py-1">${r["반코드"]}</td>
+      <td class="border px-2 py-1">${r["과목"]}</td>
+      <td class="border px-2 py-1">미수행</td>
+      <td class="border px-2 py-1">${act.action||""}</td>
+      <td class="border px-2 py-1">${act.resolved?"✓":""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------------------------------------------------------
+    초기 실행
+--------------------------------------------------------- */
+(async()=>{
+  const raw = await loadRAW();
+  window.RAW_DATA = raw;
+  render();
+})();
+</script>
+
+</body>
+</html>
