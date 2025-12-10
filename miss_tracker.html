@@ -26,7 +26,14 @@
   <!-- 헤더 -->
   <header class="mb-4 flex items-center gap-2">
     <a class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300" href="./index.html">← 메인 대시보드</a>
-    <h1 class="text-2xl font-bold">미수행 학생 관리</h1>
+
+    <!-- 인쇄 버튼 -->
+    <button id="btnPrintMiss"
+      class="px-3 py-2 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-700 ml-1">
+      미수행 인쇄
+    </button>
+
+    <h1 class="text-2xl font-bold ml-3">미수행 학생 관리</h1>
     <span class="ml-2 text-xs text-slate-500">담임 입력은 빠르게 · 관리자는 한눈에</span>
 
     <div class="ml-auto flex items-center gap-2 text-sm">
@@ -40,7 +47,6 @@
   <!-- 상단 바 -->
   <section class="mb-4 bg-white rounded-xl shadow p-4">
     <div class="flex flex-wrap items-end gap-3">
-
       <div>
         <label class="block text-xs font-medium mb-1">시작일</label>
         <input id="startDate" type="date" class="w-44 rounded-lg border-slate-300" />
@@ -82,7 +88,6 @@
         <div class="text-xs text-slate-500 mb-1">선택된 기간</div>
         <div id="rangeBadge" class="inline-block chip">전체</div>
       </div>
-
     </div>
   </section>
 
@@ -137,7 +142,7 @@
     </div>
   </section>
 
-  <!-- 관리자 대시보드 -->
+  <!-- 관리자 화면 -->
   <section id="page-admin" class="hidden bg-white rounded-xl shadow p-4">
     <div class="flex items-center gap-2 flex-wrap">
       <input id="searchAdmin" placeholder="학생/반/과목/담임 검색" class="rounded-lg border px-2 py-1 text-sm w-80"/>
@@ -186,7 +191,6 @@
         <tbody id="tbodyAdmin"></tbody>
       </table>
     </div>
-
   </section>
 
   <!-- 하단 업로드 -->
@@ -202,20 +206,16 @@
 </div> <!-- END main wrapper -->
 
 <script>
-/* ============================================
-      RAW 데이터 / ACTIONS / LocalStorage 키
-============================================ */
 let RAW = [];
 let ACTIONS = [];
 
 const LS_KEYS = {
-  autoload: 'lancon_autoload',        // index.html과 공유
-  data:     'lancon_data_json',       // index.html과 공유
-  actions:  'lancon_interventions_v3' // 조치 기록
+  autoload: 'lancon_autoload',
+  data:     'lancon_data_json',
+  actions:  'lancon_interventions_v3'
 };
 
-/* ---------- 공통 유틸 ---------- */
-
+/* 공통 유틸 */
 function fmtYMD(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,'0');
@@ -242,7 +242,7 @@ function normalizeStatus(v){
   const s=String(v||'').trim();
   if(/과제안함/.test(s)) return '미수행';
   if(/해당없음/.test(s)) return '제외';
-  if(/^\d+$/.test(s))    return '수행';
+  if(/^\d+$/.test(s)) return '수행';
   return '기타';
 }
 
@@ -250,14 +250,14 @@ function rate(done,miss){
   return Math.round((done/((done+miss)||1))*100);
 }
 
-/* ---------- 기간 관련 ---------- */
-
+/* 기간 */
 function getRange(){
   const sd=document.getElementById('startDate').value;
   const ed=document.getElementById('endDate').value;
-  const s=sd? new Date(sd+"T00:00:00"):null;
-  const e=ed? new Date(ed+"T23:59:59"):null;
-  return {s,e};
+  return {
+    s: sd? new Date(sd+"T00:00:00") : null,
+    e: ed? new Date(ed+"T23:59:59") : null
+  };
 }
 
 function inRangeDate(d){
@@ -280,8 +280,7 @@ function saveRange(){
   localStorage.setItem('lancon_range_end',   document.getElementById('endDate').value);
 }
 
-/* ---------- mapRecord: 엑셀 필드 통일 ---------- */
-
+/* CSV 매핑 */
 function mapRecord(r){
   const clean={};
   for(const k in r){
@@ -289,7 +288,7 @@ function mapRecord(r){
     const v=r[k];
     clean[nk]=(typeof v==='string')?v.trim():v;
   }
-  const obj={
+  return {
     '날짜':   clean['날짜']??clean['date']??clean['Date']??'',
     '작성자': clean['작성자']??clean['선생님']??clean['Teacher']??'',
     '과목':   clean['과목']??clean['제목']??clean['유형']??clean['subject']??'',
@@ -297,12 +296,9 @@ function mapRecord(r){
     '학생명': clean['학생명']??clean['학생']??clean['이름']??clean['student']??'',
     '상태':   clean['상태']??clean['구분']??clean['점수']??clean['점수/비고']??''
   };
-  for(const k in obj) if(typeof obj[k]==='string') obj[k]=obj[k].trim();
-  return obj;
 }
 
-/* ---------- 저장/불러오기 ---------- */
-
+/* 저장/불러오기 */
 function loadActions(){
   try{
     const s=localStorage.getItem(LS_KEYS.actions);
@@ -317,7 +313,7 @@ function saveActions(){
 function saveToLocal(rows){
   try{
     localStorage.setItem(LS_KEYS.data, JSON.stringify(rows));
-  }catch(e){console.warn(e);}
+  }catch(e){}
 }
 
 function loadFromLocal(){
@@ -327,18 +323,18 @@ function loadFromLocal(){
 
   const txt=localStorage.getItem(LS_KEYS.data);
   if(!txt) return false;
+
   try{
     const rows=JSON.parse(txt);
-    if(Array.isArray(rows) && rows.length){
+    if(Array.isArray(rows)&&rows.length){
       RAW=rows;
       return true;
     }
-  }catch(e){console.warn(e);}
+  }catch{}
   return false;
 }
 
-/* ---------- 파일 로딩 ---------- */
-
+/* 파일 읽기 */
 function readCSVText(text){
   try{
     const lines=text.split(/\r?\n/);
@@ -376,7 +372,7 @@ async function parseFile(file){
     if(isCSV){
       const text=await file.text();
       let json=readCSVText(text);
-      if(!json || !json.length){
+      if(!json||!json.length){
         const buf=await file.arrayBuffer();
         json=readArray(buf,949)||readArray(buf,51949)||readArray(buf);
       }
@@ -402,13 +398,10 @@ async function loadFromServer(){
          .filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
     saveToLocal(RAW);
     renderAll();
-  }catch(e){
-    console.warn('서버 데이터 로드 실패',e);
-  }
+  }catch(e){}
 }
 
-/* ---------- 조치키 & select 렌더 ---------- */
-
+/* 조치 key */
 function makeKey(r){
   const d=parseDate(r['날짜']);
   return [
@@ -425,23 +418,12 @@ function getActionByKey(key){
 
 function upsertAction(rec){
   const i=ACTIONS.findIndex(a=>a.key===rec.key);
-  if(i>=0) ACTIONS[i]=rec; else ACTIONS.push(rec);
+  if(i>=0) ACTIONS[i]=rec;
+  else ACTIONS.push(rec);
   saveActions();
 }
 
-function renderActionSelect(val){
-  return `
-    <select class="rounded border px-1 py-1 text-sm">
-      <option value="" ${val===""?"selected":""}>-</option>
-      <option value="수업중 처리" ${val==="수업중 처리"?"selected":""}>수업중 처리</option>
-      <option value="detention" ${val==="detention"?"selected":""}>detention</option>
-      <option value="재부과" ${val==="재부과"?"selected":""}>재부과</option>
-    </select>
-  `;
-}
-
-/* ---------- 학생별 수행률 ---------- */
-
+/* 학생별 수행률 */
 function buildStudentRates(){
   const map={};
   for(const r of RAW){
@@ -466,8 +448,7 @@ function buildStudentRates(){
   }));
 }
 
-/* ---------- 담임용 화면 ---------- */
-
+/* 담임 화면 */
 function renderTeacher(){
   const tbody=document.getElementById('tbodyTeacher');
   tbody.innerHTML='';
@@ -475,7 +456,6 @@ function renderTeacher(){
   const q=(document.getElementById('searchTeacher').value||'').trim().toLowerCase();
   const hr=document.getElementById('homeroom').value;
 
-  // 담임, 기간 저장 → print_miss.html에서 사용
   localStorage.setItem('lancon_selected_teacher', hr||'');
   saveRange();
 
@@ -494,7 +474,6 @@ function renderTeacher(){
     const key=makeKey(r);
     const act=getActionByKey(key) || {key,action:'',resolved:false,memo:'',who:hr||'',ts:''};
     const stRate=rates[r['학생명']]?.rate ?? null;
-
     const tr=document.createElement('tr');
     if(stRate!==null && stRate<=70) tr.classList.add('risk');
 
@@ -506,7 +485,14 @@ function renderTeacher(){
       </td>
       <td class="px-2 py-1">${r['반코드']}</td>
       <td class="px-2 py-1">${r['과목']}</td>
-      <td class="px-2 py-1">${renderActionSelect(act.action)}</td>
+      <td class="px-2 py-1">
+        <select class="rounded border px-1 py-1 text-sm">
+          <option value="" ${act.action===''?'selected':''}>-</option>
+          <option value="수업중 처리" ${act.action==='수업중 처리'?'selected':''}>수업중 처리</option>
+          <option value="detention" ${act.action==='detention'?'selected':''}>detention</option>
+          <option value="재부과" ${act.action==='재부과'?'selected':''}>재부과</option>
+        </select>
+      </td>
       <td class="px-2 py-1 text-center"><input type="checkbox" ${act.resolved?'checked':''}></td>
       <td class="px-2 py-1"><input type="text" class="w-64 rounded border px-2 py-1" value="${act.memo}"></td>
       <td class="px-2 py-1"><button class="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-xs">저장</button></td>
@@ -549,8 +535,7 @@ function renderTeacher(){
   });
 }
 
-/* ---------- 관리자 화면 ---------- */
-
+/* 관리자 화면 */
 function renderAdmin(){
   const tbody=document.getElementById('tbodyAdmin');
   tbody.innerHTML='';
@@ -573,7 +558,7 @@ function renderAdmin(){
     const text=`${x.ymd} ${x.name} ${x.cls} ${x.subj} ${x.teacher} ${x.action} ${x.memo}`.toLowerCase();
     if(q && !text.includes(q)) return false;
     return true;
-  }).sort((a,b)=> (b.ts||'').localeCompare(a.ts||''));
+  }).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
 
   rows.forEach(x=>{
     const tr=document.createElement('tr');
@@ -629,8 +614,7 @@ function renderAdmin(){
   });
 }
 
-/* ---------- KPI ---------- */
-
+/* KPI */
 function updateKPIs(){
   const missCnt=RAW.filter(r=>normalizeStatus(r['상태'])==='미수행' && inRangeDate(parseDate(r['날짜']))).length;
   const openCnt=ACTIONS.filter(a=>!a.resolved).length;
@@ -643,8 +627,7 @@ function updateKPIs(){
   document.getElementById('kpiRisk').textContent=riskCnt;
 }
 
-/* ---------- CSV 내보내기 / 가져오기 ---------- */
-
+/* CSV 내보내기 / 불러오기 */
 function exportCSV(){
   const header=['key','action','resolved','memo','who','ts'];
   const rows=ACTIONS.map(a=>({
@@ -696,10 +679,8 @@ async function importInterventionsFromFile(file){
   alert('조치 기록을 병합했습니다.');
 }
 
-/* ---------- 전체 렌더 ---------- */
-
+/* 전체 렌더 */
 function renderAll(){
-  // 담임 목록 갱신
   const sel=document.getElementById('homeroom');
   const uniq=Array.from(new Set(
     RAW.map(r=>String(r['작성자']||'').trim()).filter(v=>v!=='')
@@ -718,13 +699,11 @@ function renderAll(){
   updateKPIs();
 }
 
-/* ---------- 이벤트 바인딩 ---------- */
-
+/* 이벤트 바인딩 */
 function bindEvents(){
   const startDate=document.getElementById('startDate');
   const endDate=document.getElementById('endDate');
 
-  // 저장된 기간 불러오기
   const savedS=localStorage.getItem('lancon_range_start');
   const savedE=localStorage.getItem('lancon_range_end');
   if(savedS) startDate.value=savedS;
@@ -760,12 +739,14 @@ function bindEvents(){
     startDate.value=''; endDate.value='';
     updateBadge(); saveRange(); renderAll();
   };
+
   document.getElementById('rngToday').onclick=()=>{
     const d=new Date();
     const s=fmtYMD(d);
     startDate.value=s; endDate.value=s;
     updateBadge(); saveRange(); renderAll();
   };
+
   document.getElementById('rngWeekMon').onclick=()=>{
     const d=new Date();
     const day=(d.getDay()+6)%7;
@@ -774,6 +755,7 @@ function bindEvents(){
     startDate.value=fmtYMD(s); endDate.value=fmtYMD(e);
     updateBadge(); saveRange(); renderAll();
   };
+
   document.getElementById('rngMonth').onclick=()=>{
     const d=new Date();
     const s=new Date(d.getFullYear(),d.getMonth(),1);
@@ -781,6 +763,7 @@ function bindEvents(){
     startDate.value=fmtYMD(s); endDate.value=fmtYMD(e);
     updateBadge(); saveRange(); renderAll();
   };
+
   document.getElementById('rngLastWeek').onclick=()=>{
     const d=new Date();
     const day=(d.getDay()+6)%7;
@@ -789,6 +772,7 @@ function bindEvents(){
     startDate.value=fmtYMD(s); endDate.value=fmtYMD(e);
     updateBadge(); saveRange(); renderAll();
   };
+
   document.getElementById('rngLastMonth').onclick=()=>{
     const d=new Date();
     const s=new Date(d.getFullYear(),d.getMonth()-1,1);
@@ -812,22 +796,35 @@ function bindEvents(){
     const f=e.target.files[0];
     if(!f) return;
     const parsed=await parseFile(f);
-    RAW=(parsed||[]).map(mapRecord)
-         .filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
+    RAW=(parsed||[])
+      .map(mapRecord)
+      .filter(r=>Object.values(r).some(v=>String(v??'').trim()!==''));
     if(document.getElementById('autoLoad').checked) saveToLocal(RAW);
     renderAll();
   };
 
   document.getElementById('btnReloadExample').onclick=()=>loadFromServer();
-  document.getElementById('btnExport').onclick=exportCSV;
-  document.getElementById('importInterventions').onchange=(e)=>{
+  document.getElementById('btnExport').onclick = exportCSV;
+  document.getElementById('importInterventions').onchange = (e)=>{
     const f=e.target.files[0];
     if(f) importInterventionsFromFile(f);
   };
+
+  // 인쇄 버튼
+  document.getElementById("btnPrintMiss").onclick = () => {
+    const hr = document.getElementById("homeroom").value || "";
+    localStorage.setItem("lancon_selected_teacher", hr);
+
+    const s = document.getElementById("startDate").value;
+    const e = document.getElementById("endDate").value;
+    localStorage.setItem("lancon_range_start", s);
+    localStorage.setItem("lancon_range_end", e);
+
+    window.open("print_miss.html?auto=1", "_blank");
+  };
 }
 
-/* ---------- 초기 실행 ---------- */
-
+/* 초기 실행 */
 document.addEventListener('DOMContentLoaded',()=>{
   loadActions();
   bindEvents();

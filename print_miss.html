@@ -29,7 +29,7 @@
 
 <h1 class="text-2xl font-bold mb-1">미수행자 + 조치 기록</h1>
 
-<!-- ★★ 추가된 안내문구 ★★ -->
+<!-- 안내 문구 -->
 <div class="mb-3 text-sm leading-relaxed text-slate-700">
   <p>조치에는 <strong>1번(수업 중 처리), 2번(Detention), 3번(재부과)</strong> 중 번호만 적어주세요.</p>
   <p>확인란에는 조치대로 처리되었는지 확인 후 <strong>체크표시</strong>를 해주세요.</p>
@@ -53,8 +53,8 @@
 </table>
 
 <script>
-/* ---------------------------------------------------------
-    유틸
+/* --------------------------------------------------------- 
+  날짜 처리 
 --------------------------------------------------------- */
 function fmtYMD(d){
   if(!(d instanceof Date)) return "";
@@ -84,6 +84,9 @@ function normalizeStatus(v){
   return '기타';
 }
 
+/* --------------------------------------------------------- 
+  CSV 매핑
+--------------------------------------------------------- */
 function mapRecord(r){
   const clean={};
   for(const k in r){
@@ -101,15 +104,8 @@ function mapRecord(r){
   };
 }
 
-function inRange(d, s, e){
-  if(!d) return false;
-  if(s && d < s) return false;
-  if(e && d > e) return false;
-  return true;
-}
-
-/* ---------------------------------------------------------
-    RAW 로딩
+/* --------------------------------------------------------- 
+  localStorage 또는 서버에서 RAW 불러오기
 --------------------------------------------------------- */
 async function loadFromServer(){
   try{
@@ -117,15 +113,12 @@ async function loadFromServer(){
     const text=await res.text();
     const wb=XLSX.read(text,{type:'string'});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    let json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+    const json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
     return json.map(mapRecord);
   }catch{return null;}
 }
 
 async function loadRAW(){
-  if(window.opener && window.opener.RAW){
-    return window.opener.RAW;
-  }
   const txt=localStorage.getItem("lancon_data_json");
   if(txt){
     try{
@@ -136,8 +129,8 @@ async function loadRAW(){
   return await loadFromServer() || [];
 }
 
-/* ---------------------------------------------------------
-    ACTIONS
+/* --------------------------------------------------------- 
+  ACTIONS 불러오기
 --------------------------------------------------------- */
 function loadActions(){
   const txt=localStorage.getItem("lancon_interventions_v3");
@@ -158,8 +151,8 @@ function makeKey(r){
   ].join("|");
 }
 
-/* ---------------------------------------------------------
-    렌더링
+/* --------------------------------------------------------- 
+  인쇄 테이블 렌더링
 --------------------------------------------------------- */
 function render(){
   const tbody=document.getElementById("tbody");
@@ -181,7 +174,8 @@ function render(){
     .map(mapRecord)
     .filter(r=>{
       const d=parseDate(r["날짜"]);
-      if(!inRange(d,start,end)) return false;
+      if(start && d < start) return false;
+      if(end   && d > end)   return false;
       if(teacher && r["작성자"]!==teacher) return false;
       return normalizeStatus(r["상태"])==="미수행";
     })
@@ -206,13 +200,18 @@ function render(){
   });
 }
 
-/* ---------------------------------------------------------
-    초기 실행
+/* --------------------------------------------------------- 
+  초기 실행
 --------------------------------------------------------- */
 (async()=>{
   const raw = await loadRAW();
   window.RAW_DATA = raw;
   render();
+
+  const q = new URLSearchParams(location.search).get("auto");
+  if(q === "1"){
+    setTimeout(()=>window.print(), 400);
+  }
 })();
 </script>
 
